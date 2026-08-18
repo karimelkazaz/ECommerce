@@ -21,9 +21,9 @@ namespace ECommerce.Domain.Entities.ProductsBrand
             Name = name;
         }
 
-        public static Result<ProductBrand> Create(Guid id, string name)
+        public static Result<ProductBrand> Create(ProductBrandId id, string name)
         {
-            if (id == Guid.Empty)
+            if (id.Value == Guid.Empty)
                 return Result.Failure<ProductBrand>(ProductBrandErrors.InvalidId);
 
             if (string.IsNullOrWhiteSpace(name))
@@ -32,7 +32,7 @@ namespace ECommerce.Domain.Entities.ProductsBrand
             if (name.Length > MaxNameLength)
                 return Result.Failure<ProductBrand>(ProductBrandErrors.NameTooLong);
 
-            var productBrand = new ProductBrand(new ProductBrandId(id), name.Trim());
+            var productBrand = new ProductBrand(id, name.Trim());
             productBrand.RaiseDomainEvent(new ProductBrandCreatedDomainEvent(productBrand.Id));
 
             return Result.Success(productBrand);

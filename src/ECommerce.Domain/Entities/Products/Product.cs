@@ -64,7 +64,7 @@ public class Product : Entity<ProductId>
         if (price <= 0)
             return Result.Failure<Product>(ProductErrors.InvalidPrice);
 
-        var product = new Product(ProductId.New(), name, description, pictureUrl, price);
+        var product = new Product(id, name, description, pictureUrl, price);
         product.RaiseDomainEvent(new ProductCreatedDomainEvent(product.Id));
         return Result.Success(product);
     }

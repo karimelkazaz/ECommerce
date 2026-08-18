@@ -8,13 +8,13 @@ namespace ECommerce.Infrastructure.Persistence.DbContexts;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IApplicationDbContext
 {
-    public DbSet<Product> Products => Set<Product>();
-    public DbSet<ProductBrand> Brands => Set<ProductBrand>();
-    public DbSet<ProductType> Types => Set<ProductType>();
+    public DbSet<Product> ProductsSet => Set<Product>();
+    public DbSet<ProductBrand> BrandsSet => Set<ProductBrand>();
+    public DbSet<ProductType> TypesSet => Set<ProductType>();
 
-    IQueryable<Product> IApplicationDbContext.Products => Products.AsNoTracking();
-    IQueryable<ProductBrand> IApplicationDbContext.Brands => Brands.AsNoTracking();
-    IQueryable<ProductType> IApplicationDbContext.Types => Types.AsNoTracking();
+    IQueryable<Product> IApplicationDbContext.Products => ProductsSet.AsNoTracking();
+    IQueryable<ProductBrand> IApplicationDbContext.Brands => BrandsSet.AsNoTracking();
+    IQueryable<ProductType> IApplicationDbContext.Types => TypesSet.AsNoTracking();
 
 
 

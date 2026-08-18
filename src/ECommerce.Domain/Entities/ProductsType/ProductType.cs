@@ -21,9 +21,9 @@ namespace ECommerce.Domain.Entities.ProductsType
             Name = name;
         }
 
-        public static Result<ProductType> Create(Guid id, string name)
+        public static Result<ProductType> Create(ProductTypeId id, string name)
         {
-            if (id == Guid.Empty)
+            if (id.Value == Guid.Empty)
                 return Result.Failure<ProductType>(ProductTypeErrors.InvalidId);
 
             if (string.IsNullOrWhiteSpace(name))
@@ -32,7 +32,7 @@ namespace ECommerce.Domain.Entities.ProductsType
             if (name.Length > MaxNameLength)
                 return Result.Failure<ProductType>(ProductTypeErrors.NameTooLong);
 
-            var productType = new ProductType(new ProductTypeId(id), name.Trim());
+            var productType = new ProductType(id, name.Trim());
             productType.RaiseDomainEvent(new ProductTypeCreatedDomainEvent(productType.Id));
 
             return Result.Success(productType);
