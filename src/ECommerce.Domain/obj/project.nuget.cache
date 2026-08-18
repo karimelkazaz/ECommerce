@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "RiD/2CKZoRA=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\karim\\OneDrive\\Desktop\\ECommerce\\src\\ECommerce.Domain\\ECommerce.Domain.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\karim\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}
