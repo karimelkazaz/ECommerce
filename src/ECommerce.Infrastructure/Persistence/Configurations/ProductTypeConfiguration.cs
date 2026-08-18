@@ -11,6 +11,11 @@ public sealed class ProductTypeConfiguration
         EntityTypeBuilder<ProductType> builder)
     {
         BaseEntityConfiguration.Configure<ProductType, ProductTypeId>(builder);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id)
+            .HasConversion(
+                id => id.Value,
+                value => new ProductTypeId(value));
 
         builder.Property(x => x.Name)
             .IsRequired()
@@ -18,5 +23,6 @@ public sealed class ProductTypeConfiguration
 
         builder.HasIndex(x => x.Name)
             .IsUnique();
+        
     }
 }

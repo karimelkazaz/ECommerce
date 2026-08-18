@@ -13,6 +13,12 @@ namespace ECommerce.Infrastructure.Persistence.Configurations
         {
             BaseEntityConfiguration.Configure<ProductBrand, ProductBrandId>(builder);
 
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id)
+                .HasConversion(
+                    id => id.Value,
+                    value => new ProductBrandId(value));
+
             builder.Property(x => x.Name)
                 .IsRequired()
                 .HasMaxLength(200);
