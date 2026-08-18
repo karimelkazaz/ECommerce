@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace ECommerce.Infrastructure.Persistence.Interceptors;
 
-public sealed class UpdateAuditableEntitiesInterceptor : SaveChangesInterceptor
+public sealed class AuditInterceptor : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -22,7 +22,7 @@ public sealed class UpdateAuditableEntitiesInterceptor : SaveChangesInterceptor
     private readonly ICurrentUserService _currentUserService;
 
     // Inject the service here
-    public UpdateAuditableEntitiesInterceptor(ICurrentUserService currentUserService)
+    public AuditInterceptor(ICurrentUserService currentUserService)
     {
         _currentUserService = currentUserService;
     }
