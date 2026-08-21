@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using ECommerce.Domain.Entities.Orders;
 
 namespace ECommerce.Domain.Common;
 
@@ -53,4 +54,5 @@ public class Result<TValue> : Result
 
     public static Result<TValue> ValidationFailure(Error error) =>
         new(default, false, error);
+
 }
