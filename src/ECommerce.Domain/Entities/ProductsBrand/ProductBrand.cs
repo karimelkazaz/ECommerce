@@ -44,7 +44,7 @@ namespace ECommerce.Domain.Entities.ProductsBrand
                 return Result.Failure(ProductBrandErrors.InvalidName);
 
             if (name.Length > MaxNameLength)
-                return Result.Failure(ProductErrors.NameTooLong);
+                return Result.Failure(ProductBrandErrors.NameTooLong);
 
             Name = name.Trim();
             RaiseDomainEvent(new ProductBrandRenamedDomainEvent(Id));

@@ -34,6 +34,9 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
         if (string.IsNullOrWhiteSpace(name))
             return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.NameRequired);
 
+        if (string.IsNullOrWhiteSpace(deliveryTime))
+            return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.DeliveryTimeRequired);
+
         if (price is null)
             return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.PriceRequired);
 

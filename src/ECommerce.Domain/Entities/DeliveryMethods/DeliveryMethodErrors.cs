@@ -9,8 +9,12 @@ public static class DeliveryMethodErrors
         "Invalid delivery method ID.");
 
     public static readonly Error NameRequired = Error.Validation(
-        "DeliveryMethod.NameRequired", 
+        "DeliveryMethod.NameRequired",
         "Name is required.");
+
+    public static readonly Error DeliveryTimeRequired = Error.Validation(
+        "DeliveryMethod.DeliveryTimeRequired",
+        "Delivery time is required.");
 
     public static readonly Error PriceRequired = Error.Validation(
         "DeliveryMethod.PriceRequired", 

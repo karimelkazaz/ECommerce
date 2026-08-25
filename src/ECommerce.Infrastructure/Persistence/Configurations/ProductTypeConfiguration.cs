@@ -11,6 +11,8 @@ public sealed class ProductTypeConfiguration
         EntityTypeBuilder<ProductType> builder)
     {
         BaseEntityConfiguration.Configure<ProductType, ProductTypeId>(builder);
+
+        builder.ToTable("Types");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id)
             .HasConversion(

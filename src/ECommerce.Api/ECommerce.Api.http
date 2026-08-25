@@ -1,6 +1,41 @@
-@ECommerce.Api_HostAddress = http://localhost:5046
+@ECommerce.Api_HostAddress = https://localhost:7237
 
-GET {{ECommerce.Api_HostAddress}}/weatherforecast/
+### OpenAPI document
+GET {{ECommerce.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
+
+###
+
+### List brands (seeded)
+GET {{ECommerce.Api_HostAddress}}/api/brands
+Accept: application/json
+
+###
+
+### List product types (seeded)
+GET {{ECommerce.Api_HostAddress}}/api/types
+Accept: application/json
+
+###
+
+### List products (paged)
+GET {{ECommerce.Api_HostAddress}}/api/products?page=1&pageSize=10
+Accept: application/json
+
+###
+
+### Create product (replace brandId/typeId with values from /api/brands and /api/types)
+POST {{ECommerce.Api_HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Classic Tee",
+  "description": "A comfortable cotton t-shirt.",
+  "pictureUrl": "https://example.com/images/classic-tee.png",
+  "price": 19.99,
+  "currencyCode": "USD",
+  "brandId": "00000000-0000-0000-0000-000000000000",
+  "typeId": "00000000-0000-0000-0000-000000000000"
+}
 
 ###

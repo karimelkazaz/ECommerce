@@ -12,6 +12,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         BaseEntityConfiguration.Configure<Product, ProductId>(builder);
 
+        builder.ToTable("Products");
+
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id)
             .HasConversion(

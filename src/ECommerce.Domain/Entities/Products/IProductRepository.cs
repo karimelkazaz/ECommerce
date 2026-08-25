@@ -4,5 +4,6 @@ namespace ECommerce.Domain.Entities.Products
     {
         Task<Product?> GetByIdAsync(ProductId id, CancellationToken ct = default);
         void Add(Product product);
+        void Remove(Product product);
     }
 }

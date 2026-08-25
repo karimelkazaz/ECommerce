@@ -1,4 +1,4 @@
-﻿using ECommerce.Domain.Entities;
+using ECommerce.Domain.Entities;
 using ECommerce.Domain.Entities.ProductsBrand;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -12,6 +12,8 @@ namespace ECommerce.Infrastructure.Persistence.Configurations
             EntityTypeBuilder<ProductBrand> builder)
         {
             BaseEntityConfiguration.Configure<ProductBrand, ProductBrandId>(builder);
+
+            builder.ToTable("Brands");
 
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id)
