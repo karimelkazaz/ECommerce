@@ -5,12 +5,15 @@ using ECommerce.Domain.Entities.ProductsBrand;
 using ECommerce.Domain.Entities.ProductsType;
 using ECommerce.Infrastructure.Persistence.DbContexts;
 using ECommerce.Infrastructure.Persistence.Identity;
+using ECommerce.Infrastructure.Persistence.Inbox;
 using ECommerce.Infrastructure.Persistence.Interceptors;
+using ECommerce.Infrastructure.Persistence.Outbox;
 using ECommerce.Infrastructure.Persistence.Repositories;
 using ECommerce.Infrastructure.Persistence.Seeding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace ECommerce.Infrastructure
 {
@@ -27,17 +30,21 @@ namespace ECommerce.Infrastructure
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+            services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+
+            services.AddScoped<OutboxInterceptor>();
             services.AddScoped<SoftDeleteInterceptor>();
             services.AddScoped<AuditInterceptor>();
 
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
             {
+                var outboxInterceptor = sp.GetRequiredService<OutboxInterceptor>();
                 var softDeleteInterceptor = sp.GetRequiredService<SoftDeleteInterceptor>();
                 var auditInterceptor = sp.GetRequiredService<AuditInterceptor>();
 
                 options.UseSqlServer(connectionString, sql =>
                        sql.MigrationsHistoryTable("__ApplicationMigrationsHistory", "app"))
-                    .AddInterceptors(softDeleteInterceptor, auditInterceptor);
+                    .AddInterceptors(outboxInterceptor, softDeleteInterceptor, auditInterceptor);
 
                 if (enableSensitiveDataLogging)
                 {
@@ -47,6 +54,7 @@ namespace ECommerce.Infrastructure
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            services.AddScoped<IInbox, Inbox>();
 
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
@@ -55,6 +63,8 @@ namespace ECommerce.Infrastructure
             services.AddScoped<IDataSeeder, ProductBrandSeeder>();
             services.AddScoped<IDataSeeder, ProductTypeSeeder>();
             services.AddScoped<DatabaseSeeder>();
+
+            services.AddHostedService<OutboxProcessor>();
 
 
             return services;

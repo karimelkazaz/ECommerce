@@ -1,6 +1,6 @@
 namespace ECommerce.Domain.Common;
 
-public abstract class Entity<TId> : ISoftDeletable, IAuditable where TId : notnull
+public abstract class Entity<TId> : ISoftDeletable, IAuditable, IHasDomainEvents where TId : notnull
 {
     public TId Id { get; init; } = default!;
     public bool IsDeleted { get; protected set; }
@@ -14,6 +14,8 @@ public abstract class Entity<TId> : ISoftDeletable, IAuditable where TId : notnu
     public Guid? UpdatedBy { get; protected set; }
 
     private readonly List<IDomainEvent> _domainEvents = [];
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     protected Entity(TId id)
     {
