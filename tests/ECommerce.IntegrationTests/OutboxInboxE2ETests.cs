@@ -39,6 +39,10 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
                 ["Outbox:PollIntervalSeconds"] = "1",
                 ["Outbox:BatchSize"] = "10",
                 ["Outbox:MaxAttempts"] = "3",
+                ["Jwt:Issuer"] = "ECommerce.Test",
+                ["Jwt:Audience"] = "ECommerce.Test",
+                ["Jwt:SecretKey"] =
+                    "test-secret-key-that-is-at-least-32-characters-long-0123456789",
             })
             .Build();
 

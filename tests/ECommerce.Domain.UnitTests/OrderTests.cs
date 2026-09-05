@@ -14,8 +14,6 @@ public class OrderTests
 
     private static Address CreateAddress()
         => Address.Create(
-            UserId,
-            "Home",
             "John",
             "Doe",
             "+20 100 000 0000",

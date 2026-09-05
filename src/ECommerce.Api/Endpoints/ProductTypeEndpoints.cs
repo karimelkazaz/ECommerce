@@ -1,6 +1,7 @@
 using ECommerce.Api.Common;
 using ECommerce.Application.ProductsType.Commands;
 using ECommerce.Application.ProductsType.Queries;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.ProductsType;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -14,11 +15,11 @@ public static class ProductTypeEndpoints
     {
         var group = app.MapGroup("/api/types").WithTags("Types");
 
-        group.MapGet("/", GetTypes);
-        group.MapGet("/{id:guid}", GetTypeById).WithName("GetTypeById");
-        group.MapPost("/", CreateType);
-        group.MapPatch("/{id:guid}/name", RenameType);
-        group.MapDelete("/{id:guid}", DeleteType);
+        group.MapGet("/", GetTypes).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetTypeById).WithName("GetTypeById").RequireAuthorization();
+        group.MapPost("/", CreateType).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/name", RenameType).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteType).RequireAuthorization(Roles.Admin);
 
         return app;
     }

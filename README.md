@@ -1,6 +1,6 @@
 # ECommerce Platform
 
-A production-oriented e-commerce backend built with **.NET 10** and **Clean Architecture**, featuring a rich domain model, CQRS with MediatR, and reliable event-driven messaging through a transactional Outbox/Inbox pattern.
+A production-oriented e-commerce backend built with **.NET 10** and **Clean Architecture**, featuring a rich domain model, CQRS with MediatR, reliable event-driven messaging through a transactional Outbox/Inbox pattern, and full authentication (**ASP.NET Core Identity** + JWT) with verified registration and OTP flows.
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4)
@@ -15,6 +15,7 @@ A production-oriented e-commerce backend built with **.NET 10** and **Clean Arch
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Patterns and Practices](#patterns-and-practices)
+- [Authentication & Authorization](#authentication--authorization)
 - [Transactional Messaging (Outbox / Inbox)](#transactional-messaging-outbox--inbox)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -32,6 +33,8 @@ A production-oriented e-commerce backend built with **.NET 10** and **Clean Arch
 - **Strongly-typed identifiers** — every aggregate uses a dedicated `readonly record struct` ID, mapped consistently in the database.
 - **Architecture governance** — automated layer-dependency and persistence-ignorance rules enforced by NetArchTest.
 - **Minimal API endpoints** with OpenAPI documentation and RFC 7807 ProblemDetails error responses.
+- **Identity & authentication** — ASP.NET Core Identity (roles: `Admin`, `Customer`) with JWT bearer access tokens, rotating/hashed refresh tokens, and role-based endpoint authorization.
+- **Verified registration & OTP** — users register unconfirmed and are gated from login until an emailed one-time code is verified; hashed, single-use, attempt-limited OTPs also power password reset.
 
 ## Architecture
 
@@ -69,7 +72,7 @@ Dependencies point strictly inward: **Domain has zero external references**, and
 |---|---|
 | `src/ECommerce.Domain` | Aggregates, entities, value objects, domain events, `Result` pattern, common abstractions |
 | `src/ECommerce.Application` | Use cases as Commands/Queries, event handlers, pipeline behaviors, layer abstractions |
-| `src/ECommerce.Infrastructure` | EF Core persistence, interceptors, repositories, outbox/inbox implementation, seeding |
+| `src/ECommerce.Infrastructure` | EF Core persistence, interceptors, repositories, outbox/inbox implementation, identity (JWT/refresh tokens/OTP), email, seeding |
 | `src/ECommerce.Api` | HTTP layer: minimal API endpoints, OpenAPI, ProblemDetails mapping |
 | `tests/ECommerce.Domain.UnitTests` | Unit tests for domain logic and invariants |
 | `tests/ECommerce.ArchitectureTests` | Layer dependency and convention rules (NetArchTest) |
@@ -82,7 +85,19 @@ Dependencies point strictly inward: **Domain has zero external references**, and
 - **Domain events** — aggregates collect events; an interceptor flushes them into the outbox on save, keeping the model persistence-ignorant.
 - **Repository + Unit of Work** — per-aggregate repositories over a shared `DbContext` implementing `IUnitOfWork`.
 - **Soft delete & auditing** — implemented as global EF Core interceptors so callers cannot forget them.
-- **Seeding** — brand/type reference data seeded from JSON on startup in development.
+- **Seeding** — brand/type reference data seeded from JSON and a default admin user on startup in development.
+
+## Authentication & Authorization
+
+ASP.NET Core Identity with users/roles stored in SQL Server (`app` schema), JWT bearer access tokens with rotating refresh tokens:
+
+- **Roles** — `Admin` and `Customer`. Read endpoints require an authenticated user; write endpoints require `Admin`.
+- **Verified registration** — `POST /api/auth/register` creates the user with `EmailConfirmed = false` and returns no tokens; a 6-digit OTP is emailed. `POST /api/auth/confirm-email` verifies it, after which login succeeds. Until confirmed, login returns `401` `Auth.EmailNotConfirmed`; re-registering an unconfirmed email resends a new code.
+- **Access tokens** — JWT HS256, 2-hour expiry, carrying user id, email, name, and roles.
+- **Refresh tokens** — 30-day expiry, stored **hashed** (SHA-256), **single-use with rotation** (the used token is revoked and a new one issued), and revocable (`/api/auth/revoke`). Reusing an already-rotated token returns `401`.
+- **OTP** — hashed at rest, 5-minute expiry, 5 failed-attempt lockout, single-use. Serves two purposes: `EmailVerification` (confirm-email) and `PasswordReset` (reset-password flow: `send-otp` → `verify-otp` → `reset-password`).
+- **Email delivery** — MailKit/SMTP when `Smtp:Host` is configured; otherwise development falls back to the console-logging sender (OTP codes are printed in the logs).
+- **Default admin** —  Default admin is seeded in development alongside the catalog reference data.
 
 ## Transactional Messaging (Outbox / Inbox)
 
@@ -114,6 +129,8 @@ Design details:
 | Runtime | .NET 10 |
 | Web | ASP.NET Core Minimal APIs, OpenAPI |
 | Data | Entity Framework Core 10, SQL Server |
+| Identity & auth | ASP.NET Core Identity, JWT Bearer, hash-based refresh tokens |
+| Email | MailKit / SMTP (console-fallback in development) |
 | Messaging | MediatR, transactional Outbox/Inbox |
 | Validation | FluentValidation |
 | Testing | xUnit, NetArchTest |
@@ -139,11 +156,18 @@ dotnet ef database update --project src/ECommerce.Infrastructure --startup-proje
 dotnet run --project src/ECommerce.Api
 ```
 
-The API is available at `https://localhost:<port>` with OpenAPI documents exposed in development. Reference data (brands/types) is seeded automatically on startup.
+The API is available at `https://localhost:<port>` with OpenAPI documents exposed in development. Reference data (brands/types) and a default admin user are seeded automatically on startup.
+
+> **Note:** JWT/SMTP secrets live in `appsettings.Development.json`. When running EF migrations on the command line, set the environment first:
+> `$env:ASPNETCORE_ENVIRONMENT='Development'` (PowerShell) so the design-time host picks up that configuration.
 
 ## API Endpoints
 
 Base route: `/api`
+
+### Catalog & management
+
+Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`PATCH`/`DELETE`) require the `Admin` role.
 
 | Method | Route | Description |
 |---|---|---|
@@ -163,7 +187,20 @@ Base route: `/api`
 | PATCH | `/api/types/{id}/name` | Rename type |
 | DELETE | `/api/types/{id}` | Delete type |
 
-Errors are returned as RFC 7807 ProblemDetails, including validation errors.
+### Auth (anonymous except where noted)
+
+| Method | Route | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register (unconfirmed) → `{ email, verificationCodeResent, message }`, no tokens |
+| POST | `/api/auth/confirm-email` | Confirm email with the emailed OTP → `204` |
+| POST | `/api/auth/login` | Login (confirmed users) → access + refresh tokens |
+| POST | `/api/auth/refresh` | Rotate refresh token → new token pair |
+| POST | `/api/auth/revoke` | Revoke refresh token → `204` |
+| POST | `/api/auth/send-otp` | Send OTP for `EmailVerification` or `PasswordReset` |
+| POST | `/api/auth/verify-otp` | Verify an OTP |
+| POST | `/api/auth/reset-password` | Reset password using a verified OTP → `204` |
+
+Errors are returned as RFC 7807 ProblemDetails, including validation errors and auth failures (e.g., `401 Auth.EmailNotConfirmed`).
 
 ## Testing
 
@@ -179,4 +216,4 @@ dotnet test ECommerce.slnx
 
 ---
 
-> **Status:** Active development — catalog features complete; orders exist in the domain with checkout, payments, shipping, and identity planned next.
+> **Status:** Active development — catalog and identity (registration, login, refresh tokens, OTP) are complete; orders exist in the domain with checkout, payments, and shipping planned next.

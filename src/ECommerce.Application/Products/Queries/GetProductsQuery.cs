@@ -14,7 +14,17 @@ public sealed record GetProductsQuery(
     Guid? BrandId = null,
     Guid? TypeId = null,
     int Page = 1,
-    int PageSize = 10) : IRequest<PagedResponse<ProductResponse>>;
+    int PageSize = 10,
+    ProductSortField SortBy = ProductSortField.Name,
+    bool SortDescending = false) : IRequest<PagedResponse<ProductResponse>>;
+
+public enum ProductSortField
+{
+    Name,
+    Price,
+    Brand,
+    Type
+}
 
 public sealed class GetProductsQueryHandler(IApplicationDbContext db)
     : IRequestHandler<GetProductsQuery, PagedResponse<ProductResponse>>
@@ -29,29 +39,47 @@ public sealed class GetProductsQueryHandler(IApplicationDbContext db)
         if (!string.IsNullOrWhiteSpace(request.Search))
             query = query.Where(p => p.Name.Contains(request.Search));
 
-        if (request.BrandId is { } brand && brand != Guid.Empty)
-            query = query.Where(p => p.ProductBrandId == new ProductBrandId(brand));
+        if (request.BrandId.HasValue && request.BrandId != Guid.Empty)
+            query = query.Where(p => p.ProductBrandId == new ProductBrandId(request.BrandId.Value));
 
-        if (request.TypeId is { } type && type != Guid.Empty)
-            query = query.Where(p => p.ProductTypeId == new ProductTypeId(type));
+        if (request.TypeId.HasValue && request.TypeId != Guid.Empty)
+            query = query.Where(p => p.ProductTypeId == new ProductTypeId(request.TypeId.Value));
+
+        query = ApplySort(query, request.SortBy, request.SortDescending);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .OrderBy(p => p.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(p => new ProductResponse(
-                p.Id.Value,
-                p.Name,
-                p.Description,
-                p.PictureUrl,
-                p.Price.Amount,
-                p.Price.Currency.Code,
-                p.ProductBrand.Name,
-                p.ProductType.Name))
+            .Select(ProductResponse.Projection)
             .ToListAsync(cancellationToken);
 
         return new PagedResponse<ProductResponse>(items, page, pageSize, totalCount);
+    }
+
+    private static IQueryable<Product> ApplySort(
+        IQueryable<Product> query,
+        ProductSortField sortBy,
+        bool sortDescending) 
+    {
+        return sortBy switch
+        {
+            ProductSortField.Price => sortDescending
+                ? query.OrderByDescending(x => x.Price.Amount).ThenBy(x => x.Name)
+                : query.OrderBy(x => x.Price.Amount).ThenBy(x => x.Name),
+
+            ProductSortField.Brand => sortDescending
+                ? query.OrderByDescending(x => x.ProductBrand.Name).ThenBy(x => x.Name)
+                : query.OrderBy(x => x.ProductBrand.Name).ThenBy(x => x.Name),
+
+            ProductSortField.Type => sortDescending
+                ? query.OrderByDescending(x => x.ProductType.Name).ThenBy(x => x.Name)
+                : query.OrderBy(x => x.ProductType.Name).ThenBy(x => x.Name),
+
+            _ => sortDescending
+                ? query.OrderByDescending(x => x.Name)
+                : query.OrderBy(x => x.Name)
+        };
     }
 }

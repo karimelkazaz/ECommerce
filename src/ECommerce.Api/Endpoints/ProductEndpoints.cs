@@ -2,6 +2,7 @@ using ECommerce.Api.Common;
 using ECommerce.Application.Products;
 using ECommerce.Application.Products.Commands;
 using ECommerce.Application.Products.Queries;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Products;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -15,11 +16,11 @@ public static class ProductEndpoints
     {
         var group = app.MapGroup("/api/products").WithTags("Products");
 
-        group.MapGet("/", GetProducts);
-        group.MapGet("/{id:guid}", GetProductById).WithName("GetProductById");
-        group.MapPost("/", CreateProduct);
-        group.MapPatch("/{id:guid}/price", ChangePrice);
-        group.MapDelete("/{id:guid}", DeleteProduct);
+        group.MapGet("/", GetProducts).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetProductById).WithName("GetProductById").RequireAuthorization();
+        group.MapPost("/", CreateProduct).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/price", ChangePrice).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteProduct).RequireAuthorization(Roles.Admin);
 
         return app;
     }
@@ -31,9 +32,12 @@ public static class ProductEndpoints
         [FromQuery] Guid? brandId = null,
         [FromQuery] Guid? typeId = null,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] ProductSortField sortBy = ProductSortField.Name,
+        [FromQuery] bool sortDescending = false)
     {
-        var response = await sender.Send(new GetProductsQuery(search, brandId, typeId, page, pageSize), ct);
+        var response = await sender.Send(
+            new GetProductsQuery(search, brandId, typeId, page, pageSize, sortBy, sortDescending), ct);
         return Results.Ok(response);
     }
 

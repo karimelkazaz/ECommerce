@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ECommerce.Api.Endpoints;
 using ECommerce.Application;
 using ECommerce.Infrastructure;
@@ -7,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.IsDevelopment());
 
@@ -32,6 +35,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAuthEndpoints();
 app.MapProductEndpoints();
 app.MapBrandEndpoints();
 app.MapProductTypeEndpoints();

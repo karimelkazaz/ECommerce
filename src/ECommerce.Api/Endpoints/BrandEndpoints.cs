@@ -1,6 +1,7 @@
 using ECommerce.Api.Common;
 using ECommerce.Application.ProductsBrand.Commands;
 using ECommerce.Application.ProductsBrand.Queries;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.ProductsBrand;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -14,11 +15,11 @@ public static class BrandEndpoints
     {
         var group = app.MapGroup("/api/brands").WithTags("Brands");
 
-        group.MapGet("/", GetBrands);
-        group.MapGet("/{id:guid}", GetBrandById).WithName("GetBrandById");
-        group.MapPost("/", CreateBrand);
-        group.MapPatch("/{id:guid}/name", RenameBrand);
-        group.MapDelete("/{id:guid}", DeleteBrand);
+        group.MapGet("/", GetBrands).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetBrandById).WithName("GetBrandById").RequireAuthorization();
+        group.MapPost("/", CreateBrand).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/name", RenameBrand).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteBrand).RequireAuthorization(Roles.Admin);
 
         return app;
     }

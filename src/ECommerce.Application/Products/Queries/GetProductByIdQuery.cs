@@ -17,15 +17,7 @@ public sealed class GetProductByIdQueryHandler(IApplicationDbContext db)
 
         return await db.Products
             .Where(p => p.Id == productId)
-            .Select(p => new ProductResponse(
-                p.Id.Value,
-                p.Name,
-                p.Description,
-                p.PictureUrl,
-                p.Price.Amount,
-                p.Price.Currency.Code,
-                p.ProductBrand.Name,
-                p.ProductType.Name))
+            .Select(ProductResponse.Projection)
             .FirstOrDefaultAsync(cancellationToken);
     }
 }
