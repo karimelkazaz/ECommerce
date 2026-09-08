@@ -24,10 +24,7 @@ public sealed class UserAddressConfiguration : IEntityTypeConfiguration<UserAddr
             .IsRequired()
             .HasMaxLength(UserAddress.MaxLabelLength);
 
-        builder.Property(x => x.IsDefaultShipping)
-            .IsRequired();
-
-        builder.Property(x => x.IsDefaultBilling)
+        builder.Property(x => x.IsDefault)
             .IsRequired();
 
         builder.OwnsOne(x => x.Address, addressBuilder =>
