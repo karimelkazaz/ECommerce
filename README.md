@@ -94,7 +94,7 @@ ASP.NET Core Identity with users/roles stored in SQL Server (`app` schema), JWT 
 - **Roles** — `Admin` and `Customer`. Read endpoints require an authenticated user; write endpoints require `Admin`.
 - **Verified registration** — `POST /api/auth/register` creates the user with `EmailConfirmed = false` and returns no tokens; a 6-digit OTP is emailed. `POST /api/auth/confirm-email` verifies it, after which login succeeds. Until confirmed, login returns `401` `Auth.EmailNotConfirmed`; re-registering an unconfirmed email resends a new code.
 - **Access tokens** — JWT HS256, 2-hour expiry, carrying user id, email, name, and roles.
-- **Refresh tokens** — 30-day expiry, stored **hashed** (SHA-256), **single-use with rotation** (the used token is revoked and a new one issued), and revocable (`/api/auth/revoke`). Reusing an already-rotated token returns `401`.
+- **Refresh tokens** — 30-day expiry, stored **hashed** (SHA-256), **single-use with rotation** (the used token is revoked and a new one issued), and revocable (`/api/v1/auth/revoke`). Reusing an already-rotated token returns `401`.
 - **OTP** — hashed at rest, 5-minute expiry, 5 failed-attempt lockout, single-use. Serves two purposes: `EmailVerification` (confirm-email) and `PasswordReset` (reset-password flow: `send-otp` → `verify-otp` → `reset-password`).
 - **Email delivery** — MailKit/SMTP when `Smtp:Host` is configured; otherwise development falls back to the console-logging sender (OTP codes are printed in the logs).
 - **Default admin** —  Default admin is seeded in development alongside the catalog reference data.
@@ -163,7 +163,7 @@ The API is available at `https://localhost:<port>` with OpenAPI documents expose
 
 ## API Endpoints
 
-Base route: `/api`
+Base route: `/api/v{version}` (currently `v1`, e.g. `/api/v1/products`)
 
 ### Catalog & management
 
@@ -171,34 +171,34 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 
 | Method | Route | Description |
 |---|---|---|
-| GET | `/api/products` | List products — search, filter by brand/type, paginated |
-| GET | `/api/products/{id}` | Get product by ID |
-| POST | `/api/products` | Create product |
-| PATCH | `/api/products/{id}/price` | Change product price (raises price-changed event) |
-| DELETE | `/api/products/{id}` | Soft-delete product |
-| GET | `/api/brands` | List brands |
-| GET | `/api/brands/{id}` | Get brand by ID |
-| POST | `/api/brands` | Create brand |
-| PATCH | `/api/brands/{id}/name` | Rename brand |
-| DELETE | `/api/brands/{id}` | Delete brand |
-| GET | `/api/types` | List types |
-| GET | `/api/types/{id}` | Get type by ID |
-| POST | `/api/types` | Create type |
-| PATCH | `/api/types/{id}/name` | Rename type |
-| DELETE | `/api/types/{id}` | Delete type |
+| GET | `/api/v1/products` | List products — search, filter by brand/type, paginated |
+| GET | `/api/v1/products/{id}` | Get product by ID |
+| POST | `/api/v1/products` | Create product |
+| PATCH | `/api/v1/products/{id}/price` | Change product price (raises price-changed event) |
+| DELETE | `/api/v1/products/{id}` | Soft-delete product |
+| GET | `/api/v1/brands` | List brands |
+| GET | `/api/v1/brands/{id}` | Get brand by ID |
+| POST | `/api/v1/brands` | Create brand |
+| PATCH | `/api/v1/brands/{id}/name` | Rename brand |
+| DELETE | `/api/v1/brands/{id}` | Delete brand |
+| GET | `/api/v1/types` | List types |
+| GET | `/api/v1/types/{id}` | Get type by ID |
+| POST | `/api/v1/types` | Create type |
+| PATCH | `/api/v1/types/{id}/name` | Rename type |
+| DELETE | `/api/v1/types/{id}` | Delete type |
 
 ### Auth (anonymous except where noted)
 
 | Method | Route | Description |
 |---|---|---|
-| POST | `/api/auth/register` | Register (unconfirmed) → `{ email, verificationCodeResent, message }`, no tokens |
-| POST | `/api/auth/confirm-email` | Confirm email with the emailed OTP → `204` |
-| POST | `/api/auth/login` | Login (confirmed users) → access + refresh tokens |
-| POST | `/api/auth/refresh` | Rotate refresh token → new token pair |
-| POST | `/api/auth/revoke` | Revoke refresh token → `204` |
-| POST | `/api/auth/send-otp` | Send OTP for `EmailVerification` or `PasswordReset` |
-| POST | `/api/auth/verify-otp` | Verify an OTP |
-| POST | `/api/auth/reset-password` | Reset password using a verified OTP → `204` |
+| POST | `/api/v1/auth/register` | Register (unconfirmed) → `{ email, verificationCodeResent, message }`, no tokens |
+| POST | `/api/v1/auth/confirm-email` | Confirm email with the emailed OTP → `204` |
+| POST | `/api/v1/auth/login` | Login (confirmed users) → access + refresh tokens |
+| POST | `/api/v1/auth/refresh` | Rotate refresh token → new token pair |
+| POST | `/api/v1/auth/revoke` | Revoke refresh token → `204` |
+| POST | `/api/v1/auth/send-otp` | Send OTP for `EmailVerification` or `PasswordReset` |
+| POST | `/api/v1/auth/verify-otp` | Verify an OTP |
+| POST | `/api/v1/auth/reset-password` | Reset password using a verified OTP → `204` |
 
 Errors are returned as RFC 7807 ProblemDetails, including validation errors and auth failures (e.g., `401 Auth.EmailNotConfirmed`).
 

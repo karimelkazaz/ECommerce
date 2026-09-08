@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Asp.Versioning;
+using Asp.Versioning.Builder;
 using ECommerce.Api.Endpoints;
 using ECommerce.Api.ExceptionHandlers;
 using ECommerce.Application;
@@ -7,14 +9,24 @@ using ECommerce.Infrastructure.Persistence.Seeding;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.IsDevelopment());
 
-// Milan Jovanovic global error handling: specific handlers first, catch-all last.
+builder.Services
+    .AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1);
+        options.ApiVersionReader = new UrlSegmentApiVersionReader();
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'V";
+        options.SubstituteApiVersionInUrl = true;
+    })
+    .AddOpenApi();
+
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
@@ -27,10 +39,9 @@ builder.Services.AddProblemDetails(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().WithDocumentPerVersion();
 
     await using var scope = app.Services.CreateAsyncScope();
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
@@ -52,9 +63,17 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapAuthEndpoints();
-app.MapProductEndpoints();
-app.MapBrandEndpoints();
-app.MapProductTypeEndpoints();
+var apiVersionSet = app.NewApiVersionSet()
+    .HasApiVersion(new ApiVersion(1))
+    .ReportApiVersions()
+    .Build();
+
+var versionedApi = app.MapGroup("api/v{version:apiVersion}")
+    .WithApiVersionSet(apiVersionSet);
+
+versionedApi.MapAuthEndpoints();
+versionedApi.MapProductEndpoints();
+versionedApi.MapBrandEndpoints();
+versionedApi.MapProductTypeEndpoints();
 
 app.Run();

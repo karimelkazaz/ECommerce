@@ -4,8 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.ExceptionHandlers;
 
-// Milan Jovanovic approach: focused IExceptionHandler + IProblemDetailsService.
-// Catch-all handler — must be registered LAST so specific handlers run first.
 internal sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger,

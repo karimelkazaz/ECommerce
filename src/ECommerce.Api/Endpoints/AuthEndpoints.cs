@@ -9,16 +9,16 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth").WithTags("Auth");
+        var group = app.MapGroup("/auth").WithTags("Auth");
 
-        group.MapPost("/register", Register);
-        group.MapPost("/login", Login);
-        group.MapPost("/confirm-email", ConfirmEmail);
-        group.MapPost("/refresh", RefreshToken);
-        group.MapPost("/revoke", RevokeRefreshToken);
-        group.MapPost("/send-otp", SendOtp);
-        group.MapPost("/verify-otp", VerifyOtp);
-        group.MapPost("/reset-password", ResetPassword);
+        group.MapPost("/register", Register).MapToApiVersion(1);
+        group.MapPost("/login", Login).MapToApiVersion(1);
+        group.MapPost("/confirm-email", ConfirmEmail).MapToApiVersion(1);
+        group.MapPost("/refresh", RefreshToken).MapToApiVersion(1);
+        group.MapPost("/revoke", RevokeRefreshToken).MapToApiVersion(1);
+        group.MapPost("/send-otp", SendOtp).MapToApiVersion(1);
+        group.MapPost("/verify-otp", VerifyOtp).MapToApiVersion(1);
+        group.MapPost("/reset-password", ResetPassword).MapToApiVersion(1);
 
         return app;
     }

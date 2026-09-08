@@ -7,25 +7,25 @@ Accept: application/json
 ###
 
 ### List brands (seeded)
-GET {{ECommerce.Api_HostAddress}}/api/brands
+GET {{ECommerce.Api_HostAddress}}/api/v1/brands
 Accept: application/json
 
 ###
 
 ### List product types (seeded)
-GET {{ECommerce.Api_HostAddress}}/api/types
+GET {{ECommerce.Api_HostAddress}}/api/v1/types
 Accept: application/json
 
 ###
 
 ### List products (paged)
-GET {{ECommerce.Api_HostAddress}}/api/products?page=1&pageSize=10
+GET {{ECommerce.Api_HostAddress}}/api/v1/products?page=1&pageSize=10
 Accept: application/json
 
 ###
 
-### Create product (replace brandId/typeId with values from /api/brands and /api/types)
-POST {{ECommerce.Api_HostAddress}}/api/products
+### Create product (replace brandId/typeId with values from /api/v1/brands and /api/v1/types)
+POST {{ECommerce.Api_HostAddress}}/api/v1/products
 Content-Type: application/json
 
 {

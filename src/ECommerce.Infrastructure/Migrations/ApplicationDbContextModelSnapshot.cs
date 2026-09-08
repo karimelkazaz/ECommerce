@@ -157,10 +157,7 @@ namespace ECommerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<bool>("IsDefaultBilling")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDefaultShipping")
+                    b.Property<bool>("IsDefault")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")

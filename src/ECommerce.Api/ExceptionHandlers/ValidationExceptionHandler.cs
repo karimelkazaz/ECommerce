@@ -5,8 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.ExceptionHandlers;
 
-// Milan Jovanovic approach: specific handler for FluentValidation failures.
-// Registered BEFORE GlobalExceptionHandler so it gets first chance (return false to pass through).
 internal sealed class ValidationExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<ValidationExceptionHandler> logger) : IExceptionHandler

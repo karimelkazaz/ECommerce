@@ -1,11 +1,11 @@
+using Asp.Versioning.Builder;
 using ECommerce.Api.Common;
 using ECommerce.Application.ProductsBrand.Commands;
 using ECommerce.Application.ProductsBrand.Queries;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.ProductsBrand;
 using MediatR;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+
 
 namespace ECommerce.Api.Endpoints;
 
@@ -13,13 +13,13 @@ public static class BrandEndpoints
 {
     public static IEndpointRouteBuilder MapBrandEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/brands").WithTags("Brands");
+        var group = app.MapGroup("/brands").WithTags("Brands");
 
-        group.MapGet("/", GetBrands).RequireAuthorization();
-        group.MapGet("/{id:guid}", GetBrandById).WithName("GetBrandById").RequireAuthorization();
-        group.MapPost("/", CreateBrand).RequireAuthorization(Roles.Admin);
-        group.MapPatch("/{id:guid}/name", RenameBrand).RequireAuthorization(Roles.Admin);
-        group.MapDelete("/{id:guid}", DeleteBrand).RequireAuthorization(Roles.Admin);
+        group.MapGet("/", GetBrands).MapToApiVersion(1).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetBrandById).WithName("GetBrandById").MapToApiVersion(1).RequireAuthorization();
+        group.MapPost("/", CreateBrand).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/name", RenameBrand).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteBrand).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
 
         return app;
     }
@@ -41,7 +41,7 @@ public static class BrandEndpoints
         var result = await sender.Send(command, ct);
 
         return result.IsSuccess
-            ? Results.CreatedAtRoute("GetBrandById", new { id = result.Value.Id }, result.Value)
+            ? Results.CreatedAtRoute("GetBrandById", new { id = result.Value.Id, version = "1" }, result.Value)
             : result.ToProblemDetails();
     }
 

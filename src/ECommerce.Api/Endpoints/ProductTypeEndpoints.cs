@@ -1,11 +1,10 @@
+using Asp.Versioning.Builder;
 using ECommerce.Api.Common;
 using ECommerce.Application.ProductsType.Commands;
 using ECommerce.Application.ProductsType.Queries;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.ProductsType;
 using MediatR;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.Endpoints;
 
@@ -13,13 +12,13 @@ public static class ProductTypeEndpoints
 {
     public static IEndpointRouteBuilder MapProductTypeEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/types").WithTags("Types");
+        var group = app.MapGroup("/types").WithTags("Types");
 
-        group.MapGet("/", GetTypes).RequireAuthorization();
-        group.MapGet("/{id:guid}", GetTypeById).WithName("GetTypeById").RequireAuthorization();
-        group.MapPost("/", CreateType).RequireAuthorization(Roles.Admin);
-        group.MapPatch("/{id:guid}/name", RenameType).RequireAuthorization(Roles.Admin);
-        group.MapDelete("/{id:guid}", DeleteType).RequireAuthorization(Roles.Admin);
+        group.MapGet("/", GetTypes).MapToApiVersion(1).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetTypeById).WithName("GetTypeById").MapToApiVersion(1).RequireAuthorization();
+        group.MapPost("/", CreateType).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/name", RenameType).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteType).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
 
         return app;
     }
@@ -41,7 +40,7 @@ public static class ProductTypeEndpoints
         var result = await sender.Send(command, ct);
 
         return result.IsSuccess
-            ? Results.CreatedAtRoute("GetTypeById", new { id = result.Value.Id }, result.Value)
+            ? Results.CreatedAtRoute("GetTypeById", new { id = result.Value.Id, version = "1" }, result.Value)
             : result.ToProblemDetails();
     }
 

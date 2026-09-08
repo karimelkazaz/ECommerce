@@ -1,3 +1,4 @@
+using Asp.Versioning.Builder;
 using ECommerce.Api.Common;
 using ECommerce.Application.Products;
 using ECommerce.Application.Products.Commands;
@@ -5,7 +6,6 @@ using ECommerce.Application.Products.Queries;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Products;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Api.Endpoints;
@@ -14,13 +14,13 @@ public static class ProductEndpoints
 {
     public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/products").WithTags("Products");
+        var group = app.MapGroup("/products").WithTags("Products");
 
-        group.MapGet("/", GetProducts).RequireAuthorization();
-        group.MapGet("/{id:guid}", GetProductById).WithName("GetProductById").RequireAuthorization();
-        group.MapPost("/", CreateProduct).RequireAuthorization(Roles.Admin);
-        group.MapPatch("/{id:guid}/price", ChangePrice).RequireAuthorization(Roles.Admin);
-        group.MapDelete("/{id:guid}", DeleteProduct).RequireAuthorization(Roles.Admin);
+        group.MapGet("/", GetProducts).MapToApiVersion(1).RequireAuthorization();
+        group.MapGet("/{id:guid}", GetProductById).WithName("GetProductById").MapToApiVersion(1).RequireAuthorization();
+        group.MapPost("/", CreateProduct).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/price", ChangePrice).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapDelete("/{id:guid}", DeleteProduct).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
 
         return app;
     }
@@ -55,7 +55,7 @@ public static class ProductEndpoints
         var result = await sender.Send(command, ct);
 
         return result.IsSuccess
-            ? Results.CreatedAtRoute("GetProductById", new { id = result.Value.Id }, result.Value)
+            ? Results.CreatedAtRoute("GetProductById", new { id = result.Value.Id, version = "1" }, result.Value)
             : result.ToProblemDetails();
     }
 
