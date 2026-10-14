@@ -1,9 +1,12 @@
 using System.Text;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Application.Common.Options;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
 using ECommerce.Domain.Entities.ProductsType;
+using ECommerce.Domain.Repositories;
+using ECommerce.Infrastructure.Caching;
 using ECommerce.Infrastructure.Email;
 using ECommerce.Infrastructure.Persistence.DbContexts;
 using ECommerce.Infrastructure.Persistence.Identity;
@@ -19,6 +22,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace ECommerce.Infrastructure
@@ -157,9 +161,32 @@ namespace ECommerce.Infrastructure
             services.AddScoped<DatabaseSeeder>();
 
             services.AddHostedService<OutboxProcessor>();
-
+            AddBasketCaching(services, configuration);
 
             return services;
+        }
+
+        private static void AddBasketCaching(IServiceCollection services, IConfiguration configuration)
+        {
+            services.
+                AddOptions<CacheEntryPolicy>("Basket")
+                .Bind(configuration.GetSection("CachedAggregate:Basket"))
+                .ValidateOnStart();
+
+            services.AddSingleton<IValidateOptions<CacheEntryPolicy>, CacheEntryPolicyValidator>();
+
+            var redisConnection = configuration.GetConnectionString("Redis");
+            if (!string.IsNullOrWhiteSpace(redisConnection))
+            {
+                services.AddStackExchangeRedisCache(options =>
+                    options.Configuration = redisConnection);
+            }
+
+
+            services.AddHybridCache();
+
+            services.AddScoped(typeof(ICacheAggregateStore<>), typeof(CacheAggregateStore<>));
+            services.AddScoped<IBasketStore, BasketStore>();
         }
     }
 }

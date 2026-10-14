@@ -75,5 +75,6 @@ versionedApi.MapAuthEndpoints();
 versionedApi.MapProductEndpoints();
 versionedApi.MapBrandEndpoints();
 versionedApi.MapProductTypeEndpoints();
+versionedApi.MapBasketEndpoints();
 
 app.Run();

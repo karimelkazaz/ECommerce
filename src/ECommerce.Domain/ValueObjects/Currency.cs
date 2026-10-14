@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ECommerce.Domain.ValueObjects;
 
 public record Currency
@@ -7,6 +9,7 @@ public record Currency
     public static readonly Currency Usd = new("USD");
     public static readonly Currency Eur = new("EUR");
 
+    [JsonConstructor]
     private Currency(string code) => Code = code;
     public string Code { get; init; }
 

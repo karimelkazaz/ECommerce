@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ECommerce.Domain.Common;
 
 namespace ECommerce.Domain.ValueObjects;
@@ -6,6 +7,7 @@ public sealed class Money : ValueObject
     public decimal Amount { get; }
     public Currency Currency { get; }
 
+    [JsonConstructor]
     private Money(decimal amount, Currency currency) => (Amount, Currency) = (amount, currency);
 
     public static Result<Money> Create(decimal amount, Currency currency)

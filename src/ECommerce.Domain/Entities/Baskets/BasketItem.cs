@@ -62,7 +62,7 @@ public class BasketItem
         });
     }
 
-    internal decimal LineTotal => Price.Amount * Quantity;
+    public decimal LineTotal => Price.Amount * Quantity;
 
     internal Result ChangeQuantity(int quantity)
     {
