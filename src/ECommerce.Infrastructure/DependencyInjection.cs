@@ -2,6 +2,7 @@ using System.Text;
 using ECommerce.Application.Common.Interfaces;
 using ECommerce.Application.Common.Options;
 using ECommerce.Domain.Common;
+using ECommerce.Domain.Entities.DeliveryMethods;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
 using ECommerce.Domain.Entities.ProductsType;
@@ -154,9 +155,11 @@ namespace ECommerce.Infrastructure
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
             services.AddScoped<IProductTypeRepository, ProductTypeRepository>();
+            services.AddScoped<IDeliveryMethodRepository, DeliveryMethodRepository>();
 
             services.AddScoped<IDataSeeder, ProductBrandSeeder>();
             services.AddScoped<IDataSeeder, ProductTypeSeeder>();
+            services.AddScoped<IDataSeeder, DeliveryMethodSeeder>();
             services.AddScoped<IDataSeeder, IdentitySeeder>();
             services.AddScoped<DatabaseSeeder>();
 

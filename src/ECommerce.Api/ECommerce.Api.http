@@ -18,6 +18,25 @@ Accept: application/json
 
 ###
 
+### List delivery methods (seeded)
+GET {{ECommerce.Api_HostAddress}}/api/v1/delivery-methods
+Accept: application/json
+
+###
+
+### Create delivery method (admin)
+POST {{ECommerce.Api_HostAddress}}/api/v1/delivery-methods
+Content-Type: application/json
+
+{
+  "name": "Overnight Delivery",
+  "deliveryTime": "Next business day",
+  "price": 45.00,
+  "currencyCode": "USD"
+}
+
+###
+
 ### List products (paged)
 GET {{ECommerce.Api_HostAddress}}/api/v1/products?page=1&pageSize=10
 Accept: application/json

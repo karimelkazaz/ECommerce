@@ -156,7 +156,7 @@ dotnet ef database update --project src/ECommerce.Infrastructure --startup-proje
 dotnet run --project src/ECommerce.Api
 ```
 
-The API is available at `https://localhost:<port>` with OpenAPI documents exposed in development. Reference data (brands/types) and a default admin user are seeded automatically on startup.
+The API is available at `https://localhost:<port>` with OpenAPI documents exposed in development. Reference data (brands/types/delivery methods) and a default admin user are seeded automatically on startup.
 
 > **Note:** JWT/SMTP secrets live in `appsettings.Development.json`. When running EF migrations on the command line, set the environment first:
 > `$env:ASPNETCORE_ENVIRONMENT='Development'` (PowerShell) so the design-time host picks up that configuration.
@@ -186,6 +186,13 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 | POST | `/api/v1/types` | Create type |
 | PATCH | `/api/v1/types/{id}/name` | Rename type |
 | DELETE | `/api/v1/types/{id}` | Delete type |
+| GET | `/api/v1/delivery-methods` | List delivery methods |
+| GET | `/api/v1/delivery-methods/{id}` | Get delivery method by ID |
+| POST | `/api/v1/delivery-methods` | Create delivery method |
+| PATCH | `/api/v1/delivery-methods/{id}/name` | Rename delivery method |
+| PATCH | `/api/v1/delivery-methods/{id}/delivery-time` | Change delivery time |
+| PATCH | `/api/v1/delivery-methods/{id}/price` | Change delivery price (raises price-changed event) |
+| DELETE | `/api/v1/delivery-methods/{id}` | Soft-delete delivery method |
 
 ### Auth (anonymous except where noted)
 

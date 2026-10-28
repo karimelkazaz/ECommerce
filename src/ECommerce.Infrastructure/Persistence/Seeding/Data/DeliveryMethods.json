@@ -1,0 +1,30 @@
+[
+  {
+    "Id": "11111111-1111-1111-1111-111111111111",
+    "Name": "Standard Delivery",
+    "DeliveryTime": "3-5 business days",
+    "Price": 30.00,
+    "CurrencyCode": "EGP"
+  },
+  {
+    "Id": "22222222-2222-2222-2222-222222222222",
+    "Name": "Express Delivery",
+    "DeliveryTime": "1-2 business days",
+    "Price": 60.00,
+    "CurrencyCode": "EGP"
+  },
+  {
+    "Id": "33333333-3333-3333-3333-333333333333",
+    "Name": "Same-Day Delivery",
+    "DeliveryTime": "Within 6 hours",
+    "Price": 120.00,
+    "CurrencyCode": "EGP"
+  },
+  {
+    "Id": "44444444-4444-4444-4444-444444444444",
+    "Name": "Free Shipping",
+    "DeliveryTime": "5-7 business days",
+    "Price": 0.00,
+    "CurrencyCode": "EGP"
+  }
+]
