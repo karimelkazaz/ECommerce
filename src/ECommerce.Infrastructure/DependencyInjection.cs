@@ -3,6 +3,7 @@ using ECommerce.Application.Common.Interfaces;
 using ECommerce.Application.Common.Options;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.DeliveryMethods;
+using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
 using ECommerce.Domain.Entities.ProductsType;
@@ -16,6 +17,7 @@ using ECommerce.Infrastructure.Persistence.Interceptors;
 using ECommerce.Infrastructure.Persistence.Otp;
 using ECommerce.Infrastructure.Persistence.Outbox;
 using ECommerce.Infrastructure.Persistence.Repositories;
+using ECommerce.Infrastructure.Payment;
 using ECommerce.Infrastructure.Persistence.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -155,7 +157,11 @@ namespace ECommerce.Infrastructure
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
             services.AddScoped<IProductTypeRepository, ProductTypeRepository>();
+            services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<IDeliveryMethodRepository, DeliveryMethodRepository>();
+
+            services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
+            services.AddScoped<IPaymentService, StripePaymentService>();
 
             services.AddScoped<IDataSeeder, ProductBrandSeeder>();
             services.AddScoped<IDataSeeder, ProductTypeSeeder>();

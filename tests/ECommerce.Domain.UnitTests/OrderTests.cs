@@ -305,4 +305,161 @@ public class OrderTests
         Assert.True(order.DeliverOrder().IsSuccess);
         Assert.Equal(OrderStatus.Delivered, order.Status);
     }
+
+    [Fact]
+    public void Create_WithNullItemPrice_Fails()
+    {
+        var result = Order.Create(
+            OrderId.New(),
+            UserId,
+            CreateAddress(),
+            [new BasketItemDto(ProductId.New(), "T-Shirt", "tshirt.png", null!, 1)],
+            CreateDeliveryMethod());
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(OrderErrors.InvalidItemPrice.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public void Create_WithFreeDelivery_Succeeds()
+    {
+        var result = Order.Create(
+            OrderId.New(),
+            UserId,
+            CreateAddress(),
+            [BasketItem(amount: 100m)],
+            CreateDeliveryMethod(fee: 0m));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100m, result.Value.SubTotal.Amount);
+        Assert.Equal(0m, result.Value.ShippingFee.Amount);
+        Assert.Equal(100m, result.Value.Total.Amount);
+    }
+
+    [Fact]
+    public void CancelOrder_StoresReasonAndTimestamp()
+    {
+        var order = CreateOrder(BasketItem()).Value;
+        var before = DateTimeOffset.UtcNow;
+
+        var result = order.CancelOrder("  Superseded by order 42  ");
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.Equal("Superseded by order 42", order.CancellationReason);
+        Assert.InRange(order.CancelledAtUtc!.Value, before, after);
+    }
+
+    [Fact]
+    public void CancelOrder_WithoutReason_StoresOnlyTimestamp()
+    {
+        var order = CreateOrder(BasketItem()).Value;
+        var before = DateTimeOffset.UtcNow;
+
+        Assert.True(order.CancelOrder().IsSuccess);
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.Null(order.CancellationReason);
+        Assert.InRange(order.CancelledAtUtc!.Value, before, after);
+    }
+
+    [Fact]
+    public void CancelOrder_RaisesOrderCancelledDomainEvent()
+    {
+        var order = CreateOrder(BasketItem()).Value;
+        order.ClearDomainEvents();
+
+        Assert.True(order.CancelOrder("customer request").IsSuccess);
+
+        var domainEvent = Assert.Single(order.GetDomainEvents());
+        Assert.IsType<OrderCancelledDomainEvent>(domainEvent);
+    }
+
+    [Fact]
+    public void ShipOrder_RecordsShippedAtUtc()
+    {
+        var order = PaidOrder();
+        var before = DateTimeOffset.UtcNow;
+
+        Assert.True(order.ShipOrder().IsSuccess);
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.Equal(OrderStatus.Shipped, order.Status);
+        Assert.InRange(order.ShippedAtUtc!.Value, before, after);
+    }
+
+    [Fact]
+    public void DeliverOrder_RecordsDeliveredAtUtc()
+    {
+        var order = PaidOrder();
+        Assert.True(order.ShipOrder().IsSuccess);
+        var before = DateTimeOffset.UtcNow;
+
+        Assert.True(order.DeliverOrder().IsSuccess);
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.Equal(OrderStatus.Delivered, order.Status);
+        Assert.InRange(order.DeliveredAtUtc!.Value, before, after);
+    }
+
+    [Fact]
+    public void Refund_FromPending_Fails()
+    {
+        var order = CreateOrder(BasketItem()).Value;
+
+        var result = order.Refund();
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(OrderErrors.NotRefundable.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public void Refund_AfterCancelled_Fails()
+    {
+        var order = CreateOrder(BasketItem()).Value;
+        Assert.True(order.CancelOrder("customer").IsSuccess);
+
+        Assert.True(order.Refund().IsFailure);
+    }
+
+    [Fact]
+    public void Refund_FromProcessing_Succeeds()
+    {
+        var order = PaidOrder();
+        var before = DateTimeOffset.UtcNow;
+
+        var result = order.Refund();
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(OrderStatus.Refunded, order.Status);
+        Assert.InRange(order.RefundedAtUtc!.Value, before, after);
+    }
+
+    [Fact]
+    public void Refund_AfterDelivered_Succeeds()
+    {
+        var order = PaidOrder();
+        Assert.True(order.ShipOrder().IsSuccess);
+        Assert.True(order.DeliverOrder().IsSuccess);
+
+        Assert.True(order.Refund().IsSuccess);
+        Assert.Equal(OrderStatus.Refunded, order.Status);
+    }
+
+    [Fact]
+    public void Refund_Twice_IsIdempotentWithoutSecondEvent()
+    {
+        var order = PaidOrder();
+        order.ClearDomainEvents();
+        Assert.True(order.Refund().IsSuccess);
+
+        var result = order.Refund();
+
+        Assert.True(result.IsSuccess);
+        var events = order.GetDomainEvents();
+        Assert.Single(events);
+        Assert.IsType<OrderRefundedDomainEvent>(events[0]);
+    }
 }

@@ -19,6 +19,8 @@ public sealed class GetDeliveryMethodsQueryHandler(IApplicationDbContext db)
                 d.Name,
                 d.DeliveryTime,
                 d.Price.Amount,
-                d.Price.Currency.Code))
+                d.Price.Currency.Code,
+                d.Description,
+                d.IsAvailable))
             .ToListAsync(cancellationToken);
 }

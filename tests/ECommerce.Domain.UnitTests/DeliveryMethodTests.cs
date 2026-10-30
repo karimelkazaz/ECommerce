@@ -20,8 +20,9 @@ public class DeliveryMethodTests
     private static DeliveryMethod Create(
         string name = "Standard Delivery",
         string deliveryTime = "3-5 business days",
-        decimal price = 30m)
-        => DeliveryMethod.Create(DeliveryMethodId.New(), name, deliveryTime, Price(price)).Value;
+        decimal price = 30m,
+        string? description = null)
+        => DeliveryMethod.Create(DeliveryMethodId.New(), name, deliveryTime, Price(price), description).Value;
 
     [Fact]
     public void Create_WithValidData_Succeeds()
@@ -244,5 +245,133 @@ public class DeliveryMethodTests
         Assert.True(result.IsSuccess);
         var domainEvent = Assert.Single(deliveryMethod.GetDomainEvents());
         Assert.IsType<DeliveryMethodPriceChangedDomainEvent>(domainEvent);
+    }
+
+    [Fact]
+    public void Create_WithDescription_StoresTrimmedDescription()
+    {
+        var deliveryMethod = Create(description: "  Door to door delivery  ");
+
+        Assert.Equal("Door to door delivery", deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void Create_WithBlankDescription_StoresNull()
+    {
+        var deliveryMethod = Create(description: "   ");
+
+        Assert.Null(deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void Create_WithNullDescription_StoresNull()
+    {
+        var deliveryMethod = Create();
+
+        Assert.Null(deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void Create_WithTooLongDescription_Fails()
+    {
+        var result = DeliveryMethod.Create(
+            DeliveryMethodId.New(), "Express", "1-2 days", Price(),
+            new string('a', DeliveryMethod.MaxDescriptionLength + 1));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(DeliveryMethodErrors.DescriptionTooLong.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public void Create_WithMaxDescriptionLength_Succeeds()
+    {
+        var result = DeliveryMethod.Create(
+            DeliveryMethodId.New(), "Express", "1-2 days", Price(),
+            new string('a', DeliveryMethod.MaxDescriptionLength));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public void Create_DefaultsToAvailable()
+    {
+        var deliveryMethod = Create();
+
+        Assert.True(deliveryMethod.IsAvailable);
+    }
+
+    [Fact]
+    public void ChangeDescription_WithValidValue_UpdatesDescription()
+    {
+        var deliveryMethod = Create();
+
+        var result = deliveryMethod.ChangeDescription("  Faster express lane  ");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Faster express lane", deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void ChangeDescription_WithBlank_ClearsDescription()
+    {
+        var deliveryMethod = Create(description: "Courier service");
+
+        var result = deliveryMethod.ChangeDescription("   ");
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void ChangeDescription_WithTooLongValue_Fails()
+    {
+        var deliveryMethod = Create();
+
+        var result = deliveryMethod.ChangeDescription(new string('a', DeliveryMethod.MaxDescriptionLength + 1));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(DeliveryMethodErrors.DescriptionTooLong.Code, result.Error.Code);
+        Assert.Null(deliveryMethod.Description);
+    }
+
+    [Fact]
+    public void ChangeDescription_RaisesDeliveryMethodDescriptionChangedDomainEvent()
+    {
+        var deliveryMethod = Create();
+        deliveryMethod.ClearDomainEvents();
+
+        var result = deliveryMethod.ChangeDescription("Courier pickup");
+
+        Assert.True(result.IsSuccess);
+        var domainEvent = Assert.Single(deliveryMethod.GetDomainEvents());
+        Assert.IsType<DeliveryMethodDescriptionChangedDomainEvent>(domainEvent);
+    }
+
+    [Fact]
+    public void ChangeAvailability_UpdatesAvailability()
+    {
+        var deliveryMethod = Create();
+
+        var unavailable = deliveryMethod.ChangeAvailability(false);
+        Assert.True(unavailable.IsSuccess);
+        Assert.False(deliveryMethod.IsAvailable);
+
+        var available = deliveryMethod.ChangeAvailability(true);
+        Assert.True(available.IsSuccess);
+        Assert.True(deliveryMethod.IsAvailable);
+    }
+
+    [Fact]
+    public void ChangeAvailability_RaisesDeliveryMethodAvailabilityChangedDomainEvent()
+    {
+        var deliveryMethod = Create();
+        deliveryMethod.ClearDomainEvents();
+
+        var result = deliveryMethod.ChangeAvailability(false);
+
+        Assert.True(result.IsSuccess);
+        var domainEvent = Assert.IsType<DeliveryMethodAvailabilityChangedDomainEvent>(
+            Assert.Single(deliveryMethod.GetDomainEvents()));
+        Assert.False(domainEvent.IsAvailable);
     }
 }

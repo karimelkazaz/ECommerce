@@ -192,7 +192,26 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 | PATCH | `/api/v1/delivery-methods/{id}/name` | Rename delivery method |
 | PATCH | `/api/v1/delivery-methods/{id}/delivery-time` | Change delivery time |
 | PATCH | `/api/v1/delivery-methods/{id}/price` | Change delivery price (raises price-changed event) |
+| PATCH | `/api/v1/delivery-methods/{id}/description` | Change or clear delivery description |
+| PATCH | `/api/v1/delivery-methods/{id}/availability` | Toggle availability (checkout rejects unavailable methods) |
 | DELETE | `/api/v1/delivery-methods/{id}` | Soft-delete delivery method |
+
+### Orders (authenticated)
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/v1/orders` | List the current user's orders (`page`, `pageSize`, `status`) |
+| GET | `/api/v1/orders/{id}` | Get an own order (404 for other users' orders) |
+| POST | `/api/v1/orders/checkout` | Checkout the basket → creates an order + Stripe payment intent, cancels superseded pending orders |
+| POST | `/api/v1/orders/{id}/cancel` | Cancel own Pending order |
+| PATCH | `/api/v1/orders/{id}/ship` | Admin: mark a paid order shipped |
+| PATCH | `/api/v1/orders/{id}/deliver` | Admin: mark a shipped order delivered |
+| PATCH | `/api/v1/orders/{id}/cancel` | Admin: cancel a Pending/Processing order |
+| POST | `/api/v1/webhooks/stripe` | Anonymous Stripe webhook (signature-verified; `payment_intent.*` events) |
+
+Checkout re-validates cached basket prices against live products (fails on `ProductPriceChanged`/`ProductNotFound`),
+consumes the basket, and returns the payment intent `clientSecret` for the client-side Stripe.js confirmation.
+Webhook handling is idempotent: late/duplicate events cannot overwrite a later lifecycle state.
 
 ### Auth (anonymous except where noted)
 
@@ -223,4 +242,4 @@ dotnet test ECommerce.slnx
 
 ---
 
-> **Status:** Active development — catalog and identity (registration, login, refresh tokens, OTP) are complete; orders exist in the domain with checkout, payments, and shipping planned next.
+> **Status:** Active development — catalog, identity (registration, login, refresh tokens, OTP), and orders (checkout, Stripe payments, shipping lifecycle, refunds) are complete.

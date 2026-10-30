@@ -24,7 +24,7 @@ Accept: application/json
 
 ###
 
-### Create delivery method (admin)
+### Create delivery method (admin, optional description)
 POST {{ECommerce.Api_HostAddress}}/api/v1/delivery-methods
 Content-Type: application/json
 
@@ -32,7 +32,28 @@ Content-Type: application/json
   "name": "Overnight Delivery",
   "deliveryTime": "Next business day",
   "price": 45.00,
-  "currencyCode": "USD"
+  "currencyCode": "USD",
+  "description": "Delivered before 10 AM the next business day."
+}
+
+###
+
+### Change delivery method description (admin, null clears it)
+PATCH {{ECommerce.Api_HostAddress}}/api/v1/delivery-methods/{id}/description
+Content-Type: application/json
+
+{
+  "description": "Delivered before 10 AM the next business day."
+}
+
+###
+
+### Toggle delivery method availability (admin)
+PATCH {{ECommerce.Api_HostAddress}}/api/v1/delivery-methods/{id}/availability
+Content-Type: application/json
+
+{
+  "isAvailable": false
 }
 
 ###
@@ -55,6 +76,67 @@ Content-Type: application/json
   "currencyCode": "USD",
   "brandId": "00000000-0000-0000-0000-000000000000",
   "typeId": "00000000-0000-0000-0000-000000000000"
+}
+
+###
+
+### List my orders (authenticated — set the access token first)
+GET {{ECommerce.Api_HostAddress}}/api/v1/orders?page=1&pageSize=10
+Authorization: Bearer <access-token>
+
+###
+
+### Get my order by id (authenticated)
+GET {{ECommerce.Api_HostAddress}}/api/v1/orders/<order-id>
+Authorization: Bearer <access-token>
+
+###
+
+### Checkout the basket (authenticated; replaces deliveryMethodId/shippingAddressId with real values)
+POST {{ECommerce.Api_HostAddress}}/api/v1/orders/checkout
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "deliveryMethodId": "00000000-0000-0000-0000-000000000000",
+  "shippingAddressId": "00000000-0000-0000-0000-000000000000"
+}
+
+###
+
+### Cancel my own pending order (authenticated)
+POST {{ECommerce.Api_HostAddress}}/api/v1/orders/<order-id>/cancel
+Authorization: Bearer <access-token>
+
+###
+
+### Ship order (admin)
+PATCH {{ECommerce.Api_HostAddress}}/api/v1/orders/<order-id>/ship
+Authorization: Bearer <admin-access-token>
+
+###
+
+### Deliver order (admin)
+PATCH {{ECommerce.Api_HostAddress}}/api/v1/orders/<order-id>/deliver
+Authorization: Bearer <admin-access-token>
+
+###
+
+### Cancel order (admin)
+PATCH {{ECommerce.Api_HostAddress}}/api/v1/orders/<order-id>/cancel
+Authorization: Bearer <admin-access-token>
+
+###
+
+### Stripe webhook (anonymous; Stripe sends raw JSON + Stripe-Signature header)
+POST {{ECommerce.Api_HostAddress}}/api/v1/webhooks/stripe
+Content-Type: application/json
+Stripe-Signature: t=000000,v1=<signature>
+
+{
+  "id": "evt_test",
+  "type": "payment_intent.succeeded",
+  "data": { "object": { "id": "pi_test" } }
 }
 
 ###

@@ -11,12 +11,25 @@ public class DeliveryMethodSeeder(ApplicationDbContext dbContext, ILogger<Delive
     public int Order => 3;
 
     public async Task SeedAsync(CancellationToken ct = default)
-        => await JsonSeeder.SeedIfEmpty<DeliveryMethod, DeliveryMethodSeedModel>
+    {
+        DeliveryMethod Map(DeliveryMethodSeedModel d)
+        {
+            var deliveryMethod = DeliveryMethod.Create(
+                    new DeliveryMethodId(d.Id),
+                    d.Name,
+                    d.DeliveryTime,
+                    Money.Create(d.Price, Currency.FromCode(d.CurrencyCode)).Value,
+                    d.Description).Value;
+
+            if (!d.IsAvailable)
+                deliveryMethod.ChangeAvailability(false);
+
+            return deliveryMethod;
+        }
+
+        await JsonSeeder.SeedIfEmpty<DeliveryMethod, DeliveryMethodSeedModel>
                 (dbContext.DeliveryMethodsSet, "DeliveryMethods.json",
-                d => DeliveryMethod.Create(
-                        new DeliveryMethodId(d.Id),
-                        d.Name,
-                        d.DeliveryTime,
-                        Money.Create(d.Price, Currency.FromCode(d.CurrencyCode)).Value).Value,
+                Map,
                 logger, ct);
+    }
 }

@@ -5,4 +5,6 @@ public sealed record DeliveryMethodResponse(
     string Name,
     string DeliveryTime,
     decimal Price,
-    string Currency);
+    string Currency,
+    string? Description,
+    bool IsAvailable);

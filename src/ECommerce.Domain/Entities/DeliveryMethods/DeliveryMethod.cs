@@ -8,9 +8,12 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
 {
     public const int MaxNameLength = 200;
     public const int MaxDeliveryTimeLength = 200;
+    public const int MaxDescriptionLength = 1000;
 
     public string Name { get; private set; } = null!;
     public string DeliveryTime { get; private set; } = null!;
+    public string? Description { get; private set; }
+    public bool IsAvailable { get; private set; }
     public Money Price { get; private set; } = null!;
 
     private DeliveryMethod() { }
@@ -19,10 +22,13 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
         DeliveryMethodId id,
         string name,
         string deliveryTime,
+        string? description,
         Money price) : base(id)
     {
         Name = name;
         DeliveryTime = deliveryTime;
+        Description = description;
+        IsAvailable = true;
         Price = price;
     }
 
@@ -30,7 +36,8 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
         DeliveryMethodId id,
         string name,
         string deliveryTime,
-        Money price)
+        Money price,
+        string? description = null)
     {
         if (id.Value == Guid.Empty)
             return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.InvalidId);
@@ -53,7 +60,13 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
         if (price.Amount < 0)
             return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.InvalidPrice);
 
-        var deliveryMethod = new DeliveryMethod(id, name.Trim(), deliveryTime.Trim(), price);
+        if (description is { Length: > MaxDescriptionLength })
+            return Result.Failure<DeliveryMethod>(DeliveryMethodErrors.DescriptionTooLong);
+
+        var trimmedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+        var deliveryMethod = new DeliveryMethod(
+            id, name.Trim(), deliveryTime.Trim(), trimmedDescription, price);
         deliveryMethod.RaiseDomainEvent(new DeliveryMethodCreatedDomainEvent(deliveryMethod.Id));
 
         return Result.Success(deliveryMethod);
@@ -96,6 +109,25 @@ public class DeliveryMethod : Entity<DeliveryMethodId>
         var oldPrice = Price;
         Price = price;
         RaiseDomainEvent(new DeliveryMethodPriceChangedDomainEvent(Id, oldPrice, price));
+
+        return Result.Success();
+    }
+
+    public Result ChangeDescription(string? description)
+    {
+        if (description is { Length: > MaxDescriptionLength })
+            return Result.Failure(DeliveryMethodErrors.DescriptionTooLong);
+
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        RaiseDomainEvent(new DeliveryMethodDescriptionChangedDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    public Result ChangeAvailability(bool isAvailable)
+    {
+        IsAvailable = isAvailable;
+        RaiseDomainEvent(new DeliveryMethodAvailabilityChangedDomainEvent(Id, isAvailable));
 
         return Result.Success();
     }

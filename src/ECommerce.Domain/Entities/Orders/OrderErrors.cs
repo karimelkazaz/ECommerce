@@ -25,4 +25,18 @@ public static class OrderErrors
     public static readonly Error InvalidQuantity =
         Error.Validation("Order.InvalidQuantity", "Quantity must be at least 1.");
 
+    public static readonly Error InvalidItemPrice =
+        Error.Validation("Order.InvalidItemPrice", "Item price is required.");
+
+    public static readonly Error ProductNotFound =
+        Error.NotFound("Order.ProductNotFound", "One or more products in your basket are no longer available.");
+
+    public static readonly Error ProductPriceChanged =
+        Error.Validation("Order.ProductPriceChanged", "The price of one or more items in your basket has changed.");
+
+    public static readonly Error InvalidTotal =
+        Error.Validation("Order.InvalidTotal", "Order total must be greater than zero.");
+
+    public static readonly Error NotRefundable =
+        Error.Validation("Order.NotRefundable", "Order is not in a valid state for a refund.");
 }

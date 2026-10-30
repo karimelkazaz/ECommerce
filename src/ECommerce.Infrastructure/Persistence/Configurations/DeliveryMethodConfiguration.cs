@@ -29,6 +29,14 @@ namespace ECommerce.Infrastructure.Persistence.Configurations
                 .IsRequired()
                 .HasMaxLength(DeliveryMethod.MaxDeliveryTimeLength);
 
+            builder.Property(x => x.Description)
+                .HasMaxLength(DeliveryMethod.MaxDescriptionLength);
+
+            // Default true keeps existing rows available when the column is first added.
+            builder.Property(x => x.IsAvailable)
+                .IsRequired()
+                .HasDefaultValue(true);
+
             builder.OwnsOne(x => x.Price, priceBuilder =>
             {
                 priceBuilder.Property(m => m.Amount)

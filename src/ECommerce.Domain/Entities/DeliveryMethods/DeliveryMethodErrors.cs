@@ -35,4 +35,12 @@ public static class DeliveryMethodErrors
     public static readonly Error InvalidPrice = Error.Validation(
         "DeliveryMethod.InvalidPrice",
         "Price cannot be negative.");
+
+    public static readonly Error DescriptionTooLong = Error.Validation(
+        "DeliveryMethod.DescriptionTooLong",
+        $"Description cannot exceed {DeliveryMethod.MaxDescriptionLength} characters.");
+
+    public static readonly Error NotAvailable = Error.Conflict(
+        "DeliveryMethod.NotAvailable",
+        "Delivery method is currently unavailable.");
 }

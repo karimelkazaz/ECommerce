@@ -13,7 +13,8 @@ public sealed record CreateDeliveryMethodCommand(
     string Name,
     string DeliveryTime,
     decimal Price,
-    string CurrencyCode) : IRequest<Result<DeliveryMethodResponse>>;
+    string CurrencyCode,
+    string? Description = null) : IRequest<Result<DeliveryMethodResponse>>;
 
 public sealed class CreateDeliveryMethodCommandHandler(
     IDeliveryMethodRepository deliveryMethods,
@@ -32,7 +33,8 @@ public sealed class CreateDeliveryMethodCommandHandler(
             DeliveryMethodId.New(),
             request.Name,
             request.DeliveryTime,
-            priceResult.Value);
+            priceResult.Value,
+            request.Description);
 
         if (result.IsFailure)
             return Result.Failure<DeliveryMethodResponse>(result.Error);
@@ -46,7 +48,9 @@ public sealed class CreateDeliveryMethodCommandHandler(
             deliveryMethod.Name,
             deliveryMethod.DeliveryTime,
             deliveryMethod.Price.Amount,
-            deliveryMethod.Price.Currency.Code);
+            deliveryMethod.Price.Currency.Code,
+            deliveryMethod.Description,
+            deliveryMethod.IsAvailable);
     }
 }
 
@@ -61,6 +65,9 @@ public sealed class CreateDeliveryMethodCommandValidator : AbstractValidator<Cre
         RuleFor(c => c.DeliveryTime)
             .NotEmpty()
             .MaximumLength(DeliveryMethod.MaxDeliveryTimeLength);
+
+        RuleFor(c => c.Description)
+            .MaximumLength(DeliveryMethod.MaxDescriptionLength);
 
         RuleFor(c => c.Price)
             .GreaterThanOrEqualTo(0);

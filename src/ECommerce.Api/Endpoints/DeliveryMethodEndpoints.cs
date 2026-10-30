@@ -20,6 +20,8 @@ public static class DeliveryMethodEndpoints
         group.MapPatch("/{id:guid}/name", RenameDeliveryMethod).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
         group.MapPatch("/{id:guid}/delivery-time", ChangeDeliveryTime).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
         group.MapPatch("/{id:guid}/price", ChangePrice).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/description", ChangeDescription).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
+        group.MapPatch("/{id:guid}/availability", ChangeAvailability).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
         group.MapDelete("/{id:guid}", DeleteDeliveryMethod).MapToApiVersion(1).RequireAuthorization(Roles.Admin);
 
         return app;
@@ -75,6 +77,32 @@ public static class DeliveryMethodEndpoints
     private static async Task<IResult> ChangePrice(
         Guid id,
         ChangeDeliveryMethodPriceCommand command,
+        ISender sender,
+        CancellationToken ct)
+    {
+        var result = await sender.Send(command with { Id = id }, ct);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : result.ToProblemDetails();
+    }
+
+    private static async Task<IResult> ChangeDescription(
+        Guid id,
+        ChangeDeliveryMethodDescriptionCommand command,
+        ISender sender,
+        CancellationToken ct)
+    {
+        var result = await sender.Send(command with { Id = id }, ct);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : result.ToProblemDetails();
+    }
+
+    private static async Task<IResult> ChangeAvailability(
+        Guid id,
+        ChangeDeliveryMethodAvailabilityCommand command,
         ISender sender,
         CancellationToken ct)
     {

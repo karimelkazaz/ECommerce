@@ -10,8 +10,19 @@ public class Order : Entity<OrderId>
     private readonly List<OrderItem> _orderItems = [];
 
     public Guid UserId { get; private set; }
+
+    // Payment tracking
     public DateTimeOffset? PaidAtUtc { get; private set; }
+    public DateTimeOffset? RefundedAtUtc { get; private set; }
+    public DateTimeOffset? CancelledAtUtc { get; private set; }
+    public string? CancellationReason { get; private set; }
+
+    // Fulfilment tracking
+    public DateTimeOffset? ShippedAtUtc { get; private set; }
+    public DateTimeOffset? DeliveredAtUtc { get; private set; }
+
     public Address ShippingAddress { get; private set; } = null!;
+
     public OrderStatus Status { get; private set; }
 
     // Delivery Snapshot
@@ -68,7 +79,22 @@ public class Order : Entity<OrderId>
         if (liveDeliveryMethod is null)
             return Result.Failure<Order>(OrderErrors.InvalidDeliveryMethod);
 
+        // Validate currencies across the whole basket before building any totals so
+        // a mismatch fails before the order is constructed.
+        foreach (var item in basketItems)
+        {
+            if (item.Price is null)
+                return Result.Failure<Order>(OrderErrors.InvalidItemPrice);
+        }
+
         var currency = basketItems[0].Price.Currency;
+
+        foreach (var item in basketItems)
+        {
+            if (item.Price.Currency != currency)
+                return Result.Failure<Order>(OrderErrors.CurrencyMismatch);
+        }
+
         if (liveDeliveryMethod.Price.Currency != currency)
             return Result.Failure<Order>(OrderErrors.CurrencyMismatch);
 
@@ -76,20 +102,16 @@ public class Order : Entity<OrderId>
         decimal subTotalAmount = basketItems.Sum(i => i.Price.Amount * i.Quantity);
         var subTotal = Money.Create(subTotalAmount, currency).Value;
 
-
         var order = new Order(
             id,
             userId,
             shippingAddress,
             liveDeliveryMethod,
             subTotal,
-            liveDeliveryMethod.Price);
+            shippingFee: Money.Create(liveDeliveryMethod.Price.Amount, currency).Value);
 
         foreach (var item in basketItems)
         {
-            if (item.Price.Currency != currency)
-                return Result.Failure<Order>(OrderErrors.CurrencyMismatch);
-
             var orderItemResult = OrderItem.Create(
                 OrderItemId.New(),
                 item.ProductId,
@@ -160,6 +182,7 @@ public class Order : Entity<OrderId>
             return Result.Failure(OrderErrors.InvalidStateTransition);
 
         Status = OrderStatus.Shipped;
+        ShippedAtUtc = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new OrderShippedDomainEvent(Id));
 
         return Result.Success();
@@ -171,18 +194,37 @@ public class Order : Entity<OrderId>
             return Result.Failure(OrderErrors.InvalidStateTransition);
 
         Status = OrderStatus.Delivered;
+        DeliveredAtUtc = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new OrderDeliveredDomainEvent(Id));
 
         return Result.Success();
     }
 
-    public Result CancelOrder()
+    public Result CancelOrder(string? reason = null)
     {
         if (Status != OrderStatus.Pending && Status != OrderStatus.Processing)
             return Result.Failure(OrderErrors.InvalidStateTransition);
 
         Status = OrderStatus.Cancelled;
+        CancelledAtUtc = DateTimeOffset.UtcNow;
+        CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         RaiseDomainEvent(new OrderCancelledDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    public Result Refund()
+    {
+        // Idempotent: replayed refunds resolve to success without raising another event.
+        if (Status == OrderStatus.Refunded)
+            return Result.Success();
+
+        if (Status is not (OrderStatus.Processing or OrderStatus.Shipped or OrderStatus.Delivered))
+            return Result.Failure(OrderErrors.NotRefundable);
+
+        Status = OrderStatus.Refunded;
+        RefundedAtUtc = DateTimeOffset.UtcNow;
+        RaiseDomainEvent(new OrderRefundedDomainEvent(Id));
 
         return Result.Success();
     }

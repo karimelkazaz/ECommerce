@@ -22,7 +22,9 @@ public sealed class GetDeliveryMethodByIdQueryHandler(IApplicationDbContext db)
                 d.Name,
                 d.DeliveryTime,
                 d.Price.Amount,
-                d.Price.Currency.Code))
+                d.Price.Currency.Code,
+                d.Description,
+                d.IsAvailable))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

@@ -46,16 +46,15 @@ public class OrderItem : Entity<OrderItemId>
         if (quantity < 1)
             return Result.Failure<OrderItem>(OrderErrors.InvalidQuantity);
 
-        return Result.Success(new OrderItem
-        {
-            Id = id,
-            ProductId = productId,
-            ProductName = productName,
-            PictureUrl = pictureUrl,
-            Price = price,
-            Quantity = quantity
-        });
+        if (price is null)
+            return Result.Failure<OrderItem>(OrderErrors.InvalidItemPrice);
+
+        return Result.Success(new OrderItem(
+            id,
+            productId,
+            productName,
+            pictureUrl,
+            price,
+            quantity));
     }
-
 }
-

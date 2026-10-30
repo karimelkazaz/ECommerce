@@ -31,7 +31,23 @@ public class DeliveryMethodApplicationTests
         Assert.Equal("1-2 days", result.Value.DeliveryTime);
         Assert.Equal(60m, result.Value.Price);
         Assert.Equal("USD", result.Value.Currency);
+        Assert.Null(result.Value.Description);
+        Assert.True(result.Value.IsAvailable);
         Assert.Single(_deliveryMethods.Items);
+    }
+
+    [Fact]
+    public async Task CreateDeliveryMethodCommandHandler_WithDescription_ReturnsDescriptionAndAvailability()
+    {
+        var handler = new CreateDeliveryMethodCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new CreateDeliveryMethodCommand("Express", "1-2 days", 60m, "USD", "  Priority handling  "),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Priority handling", result.Value.Description);
+        Assert.True(result.Value.IsAvailable);
     }
 
     [Fact]
@@ -193,6 +209,81 @@ public class DeliveryMethodApplicationTests
     }
 
     [Fact]
+    public async Task ChangeDeliveryMethodDescriptionCommandHandler_WithValidCommand_UpdatesDescription()
+    {
+        var deliveryMethod = Seed();
+        _deliveryMethods.Add(deliveryMethod);
+
+        var handler = new ChangeDeliveryMethodDescriptionCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new ChangeDeliveryMethodDescriptionCommand(deliveryMethod.Id.Value, "  Courier pickup  "),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Courier pickup", deliveryMethod.Description);
+    }
+
+    [Fact]
+    public async Task ChangeDeliveryMethodDescriptionCommandHandler_WithBlank_ClearsDescription()
+    {
+        var deliveryMethod = Seed();
+        deliveryMethod.ChangeDescription("Courier pickup");
+        _deliveryMethods.Add(deliveryMethod);
+
+        var handler = new ChangeDeliveryMethodDescriptionCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new ChangeDeliveryMethodDescriptionCommand(deliveryMethod.Id.Value, null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(deliveryMethod.Description);
+    }
+
+    [Fact]
+    public async Task ChangeDeliveryMethodDescriptionCommandHandler_WhenNotFound_Fails()
+    {
+        var handler = new ChangeDeliveryMethodDescriptionCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new ChangeDeliveryMethodDescriptionCommand(Guid.NewGuid(), "Courier pickup"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(DeliveryMethodErrors.NotFound.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ChangeDeliveryMethodAvailabilityCommandHandler_WithValidCommand_UpdatesAvailability()
+    {
+        var deliveryMethod = Seed();
+        _deliveryMethods.Add(deliveryMethod);
+
+        var handler = new ChangeDeliveryMethodAvailabilityCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new ChangeDeliveryMethodAvailabilityCommand(deliveryMethod.Id.Value, false),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(deliveryMethod.IsAvailable);
+    }
+
+    [Fact]
+    public async Task ChangeDeliveryMethodAvailabilityCommandHandler_WhenNotFound_Fails()
+    {
+        var handler = new ChangeDeliveryMethodAvailabilityCommandHandler(_deliveryMethods, _unitOfWork);
+
+        var result = await handler.Handle(
+            new ChangeDeliveryMethodAvailabilityCommand(Guid.NewGuid(), false),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(DeliveryMethodErrors.NotFound.Code, result.Error.Code);
+    }
+
+    [Fact]
     public void CreateDeliveryMethodCommandValidator_ValidatesNameDeliveryTimePriceAndCurrency()
     {
         var validator = new CreateDeliveryMethodCommandValidator();
@@ -246,6 +337,28 @@ public class DeliveryMethodApplicationTests
 
         Assert.False(validator.Validate(new DeleteDeliveryMethodCommand(Guid.Empty)).IsValid);
         Assert.True(validator.Validate(new DeleteDeliveryMethodCommand(Guid.NewGuid())).IsValid);
+    }
+
+    [Fact]
+    public void ChangeDeliveryMethodDescriptionCommandValidator_ValidatesIdAndDescription()
+    {
+        var validator = new ChangeDeliveryMethodDescriptionCommandValidator();
+
+        Assert.False(validator.Validate(new ChangeDeliveryMethodDescriptionCommand(Guid.Empty, "Courier pickup")).IsValid);
+        Assert.False(validator.Validate(new ChangeDeliveryMethodDescriptionCommand(Guid.NewGuid(), new string('a', DeliveryMethod.MaxDescriptionLength + 1))).IsValid);
+
+        Assert.True(validator.Validate(new ChangeDeliveryMethodDescriptionCommand(Guid.NewGuid(), "Courier pickup")).IsValid);
+        Assert.True(validator.Validate(new ChangeDeliveryMethodDescriptionCommand(Guid.NewGuid(), null)).IsValid);
+    }
+
+    [Fact]
+    public void ChangeDeliveryMethodAvailabilityCommandValidator_ValidatesId()
+    {
+        var validator = new ChangeDeliveryMethodAvailabilityCommandValidator();
+
+        Assert.False(validator.Validate(new ChangeDeliveryMethodAvailabilityCommand(Guid.Empty, false)).IsValid);
+        Assert.True(validator.Validate(new ChangeDeliveryMethodAvailabilityCommand(Guid.NewGuid(), false)).IsValid);
+        Assert.True(validator.Validate(new ChangeDeliveryMethodAvailabilityCommand(Guid.NewGuid(), true)).IsValid);
     }
 
     private sealed class FakeDeliveryMethodRepository : IDeliveryMethodRepository
