@@ -3,10 +3,11 @@ using Microsoft.Extensions.Options;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
+using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Infrastructure.Email;
 
-public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSender
+public sealed class SmtpEmailSender(IOptions<SmtpOptions> options, ILogger<SmtpEmailSender> logger) : IEmailSender
 {
     public async Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct)
     {
@@ -31,6 +32,10 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         }
 
         await client.SendAsync(message, ct);
+        logger.LogInformation(
+    "Email sent successfully to {Recipient}. Subject: {Subject}",
+    to,
+    subject);
         await client.DisconnectAsync(true, ct);
     }
 }

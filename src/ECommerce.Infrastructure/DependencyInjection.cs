@@ -7,6 +7,7 @@ using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
 using ECommerce.Domain.Entities.ProductsType;
+using ECommerce.Domain.Entities.UserAddresses;
 using ECommerce.Domain.Repositories;
 using ECommerce.Infrastructure.Caching;
 using ECommerce.Infrastructure.Email;
@@ -173,6 +174,7 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
             services.AddScoped<IProductTypeRepository, ProductTypeRepository>();
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<IDeliveryMethodRepository, DeliveryMethodRepository>();
+            services.AddScoped<IUserAddressRepository, UserAddressRepository>();
 
             services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
             services.AddScoped<IPaymentService, StripePaymentService>();

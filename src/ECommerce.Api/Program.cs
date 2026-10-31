@@ -113,5 +113,8 @@ versionedApi.MapProductTypeEndpoints();
 versionedApi.MapDeliveryMethodEndpoints();
 versionedApi.MapOrderEndpoints();
 versionedApi.MapBasketEndpoints();
+versionedApi.MapUserAddressEndpoints();
+
+
 
 app.Run();

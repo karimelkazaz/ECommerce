@@ -104,4 +104,5 @@ public static class AuthEndpoints
             ? Results.NoContent()
             : result.ToProblemDetails();
     }
+
 }
