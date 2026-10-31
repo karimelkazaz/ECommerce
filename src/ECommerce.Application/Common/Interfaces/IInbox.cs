@@ -2,7 +2,9 @@ namespace ECommerce.Application.Common.Interfaces;
 
 public interface IInbox
 {
-    void BeginScope(Guid messageId, string eventType);
-
-    Task<bool> TryClaimAsync(CancellationToken cancellationToken = default);
+    Task<bool> TryClaimAsync(
+        Guid messageId,
+        string eventType,
+        string consumer,
+        CancellationToken cancellationToken = default);
 }

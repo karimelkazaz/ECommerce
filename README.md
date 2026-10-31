@@ -28,7 +28,7 @@ A production-oriented e-commerce backend built with **.NET 10** and **Clean Arch
 
 - **Rich domain model** — aggregates (`Product`, `Order`, `ProductBrand`, `ProductType`, `DeliveryMethod`) encapsulate invariants and raise domain events; all mutations flow through intention-revealing methods that return a `Result`.
 - **CQRS with MediatR** — commands and queries with cross-cutting pipeline behaviors: validation (FluentValidation), logging, performance warnings, and unhandled exception guarding.
-- **Transactional Outbox / Inbox** — domain events are persisted atomically with business data, then published asynchronously with retries, dead-lettering, app-lock based leader election, and idempotent consumption.
+- **Transactional Outbox / Inbox** — domain events are persisted atomically with business data, then published asynchronously with retries, dead-lettering, and app-lock based leader election. Every handler claims a message per consumer, and the claim commits or rolls back with that consumer's own database changes. Inbox rows are retained for a configurable window and cleaned up automatically.
 - **EF Core SaveChanges interceptors** — audit trail, soft delete, and outbox enqueueing applied transparently across the context.
 - **Strongly-typed identifiers** — every aggregate uses a dedicated `readonly record struct` ID, mapped consistently in the database.
 - **Architecture governance** — automated layer-dependency and persistence-ignorance rules enforced by NetArchTest.
@@ -83,7 +83,8 @@ Dependencies point strictly inward: **Domain has zero external references**, and
 - **Result pattern** — operations return `Result` / `Result<T>` instead of throwing for expected failures; errors carry type codes mapped to appropriate HTTP responses.
 - **CQRS** — read side uses untracked queries exposed via `IApplicationDbContext`; write side goes through repositories and the unit of work.
 - **Domain events** — aggregates collect events; an interceptor flushes them into the outbox on save, keeping the model persistence-ignorant.
-- **Repository + Unit of Work** — per-aggregate repositories over a shared `DbContext` implementing `IUnitOfWork`.
+- **Repository + Unit of Work** — per-aggregate repositories over a shared `DbContext` implementing `IUnitOfWork`; `ExecuteInTransactionAsync` gives each message consumer its own commit boundary.
+- **Idempotent consumers** — notification handlers derive from a shared base that owns the claim, transaction, save, and duplicate-suppression logging.
 - **Soft delete & auditing** — implemented as global EF Core interceptors so callers cannot forget them.
 - **Seeding** — brand/type reference data seeded from JSON and a default admin user on startup in development.
 
@@ -101,26 +102,55 @@ ASP.NET Core Identity with users/roles stored in SQL Server (`app` schema), JWT 
 
 ## Transactional Messaging (Outbox / Inbox)
 
-Domain events must never be lost or duplicated. This solution guarantees **at-least-once delivery with exactly-once side effects**:
+Domain events are written to the outbox in the same database transaction as the business data, then delivered asynchronously. Delivery is **at-least-once**, with **per-consumer deduplication**. Database effects committed with an inbox claim are exactly-once; external effects require idempotency keys or a follow-up outbox message.
 
 ```
 SaveChanges ──► OutboxInterceptor writes OutboxMessage rows
                 (same DB transaction as business data)
 
 OutboxProcessor (background service)
- ├─ acquires sp_getapplock (single active instance)
- ├─ loads Pending messages ordered by OccurredOnUtc
- ├─ deserializes and publishes via MediatR
- ├─ handlers call IInbox.TryClaimAsync → duplicate deliveries suppressed
- └─ marks Processed, retries failures up to MaxAttempts,
-    then dead-letters with the stored error
+ ├─ acquires sp_getapplock on a dedicated lock connection
+ ├─ reads pending OutboxMessage IDs
+ └─ for each message (fresh scope per message)
+     ├─ deserializes and publishes via MediatR
+     ├─ each consumer:
+     │   ├─ begins its own transaction
+     │   ├─ inserts the (MessageId, Consumer) inbox claim
+     │   ├─ executes consumer work + SaveChanges
+     │   └─ commits; rolls back claim + changes on failure
+     ├─ marks Processed after every consumer succeeds
+     └─ on failure: records the attempt in a separate scope,
+        retries up to MaxAttempts, then dead-letters
 ```
 
 Design details:
 
-- The inbox claim row is inserted through the same `DbContext`, so claims commit **atomically** with outbox status updates.
-- A SQL Server session-level application lock (`sp_getapplock`) ensures only one processor instance drains the queue per tick when running multiple API replicas.
-- Unknown event types and repeated failures are logged and dead-lettered instead of crashing the host.
+- **Per-consumer claims.** `InboxMessages` has a composite primary key `(MessageId, Consumer)`. Every handler derives from `IdempotentNotificationHandler<T>` and declares a stable `ConsumerId` such as `catalog.product-created` or `orders.order-paid`, so multiple handlers for one event each claim and run independently.
+- **Atomic claim + effects.** The claim is inserted inside the consumer's transaction. If the consumer throws, the claim and all of its database changes roll back together; retries are never suppressed by a failed attempt.
+- **Concurrency-safe claims.** Claims use a single conditional `INSERT ... WHERE NOT EXISTS` with `UPDLOCK, HOLDLOCK`; duplicate-key errors `2601`/`2627` are treated as "already claimed".
+- **No batch-wide commit.** Each message's processed status is committed separately. If a later consumer fails, earlier consumers keep their committed claims, and the retry skips them and resumes at the failed consumer.
+- **Retries stay per message.** `Outbox:MaxAttempts` counts attempts for the whole message. MediatR stops dispatching at the first failing consumer; consumers that already committed are skipped on retry. A permanently failing consumer can dead-letter the message, but requeueing it cannot re-run consumers whose claims were committed.
+- **Retention and cleanup.** `InboxCleanupService` deletes rows older than `Inbox:RetentionDays` (default `30`) every `Inbox:CleanupIntervalMinutes` (default `60`) under a SQL application lock. Retention must be longer than the outbox retry/dead-letter/replay window: replaying a message after its claims were deleted executes the consumers again.
+- **Consumer IDs are stable API.** Never derive them from type or file names. If consumer logic changes and old messages must replay, bump the ID explicitly (for example `catalog.product-created:v2`).
+- **Deployment requires an outbox drain.** Pause the processor and drain pending messages before applying the per-consumer inbox migration. Existing claims are backfilled as `Consumer = 'legacy'`; in-flight messages may otherwise be processed once more per consumer. With the current log-only handlers this is low risk.
+- **Rollback discards dedupe history.** The migration's `Down` drops and recreates `InboxMessages` because the old schema cannot represent several claims for one message.
+- A SQL Server session-level application lock (`sp_getapplock`) ensures only one processor instance drains the queue per tick when running multiple API replicas. Unknown event types and repeated failures are logged and dead-lettered instead of crashing the host.
+
+### External side effects
+
+- An inbox claim deduplicates only work performed inside the same database transaction. `IEmailSender`, Stripe, HTTP clients, and other external calls are **not** transactional.
+- Do not call an external side effect directly from a domain-event handler unless the provider supports a stable idempotency key.
+- Preferred pattern:
+  1. The consumer claims the message and updates local state.
+  2. The consumer writes a follow-up `OutboxMessage` through `IOutboxWriter.Enqueue(...)`.
+  3. The transaction commits.
+  4. A relay processes the follow-up message and calls the external service.
+  5. The external service or recipient deduplicates using the stable key.
+- Use `{outboxMessageId}:{consumerId}` (from `IOutboxMessageContext.MessageId`) as the idempotency key. For Stripe, pass it as `Idempotency-Key` and persist the provider reference.
+- For email, use a provider-side dedupe key or a local sent-email table with a unique key. If the provider has no idempotency support, accept at-least-once email delivery and document it.
+- Another internal service should use its own inbox keyed by the same message ID.
+
+> **Delivery guarantee:** at-least-once delivery with per-consumer deduplication and effectively-once effects. Exactly-once external delivery is not achievable without receiver-side idempotency.
 
 ## Tech Stack
 

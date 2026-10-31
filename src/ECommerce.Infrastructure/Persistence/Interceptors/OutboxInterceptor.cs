@@ -1,4 +1,3 @@
-using System.Text.Json;
 using ECommerce.Domain.Common;
 using ECommerce.Infrastructure.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace ECommerce.Infrastructure.Persistence.Interceptors;
 
-public sealed class OutboxInterceptor : SaveChangesInterceptor
+public sealed class OutboxInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -20,7 +19,7 @@ public sealed class OutboxInterceptor : SaveChangesInterceptor
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
-    private static void EnqueueDomainEvents(DbContext? dbContext)
+    private void EnqueueDomainEvents(DbContext? dbContext)
     {
         if (dbContext is null)
         {
@@ -38,13 +37,10 @@ public sealed class OutboxInterceptor : SaveChangesInterceptor
             return;
         }
 
-        var utcNow = DateTimeOffset.UtcNow;
+        var utcNow = timeProvider.GetUtcNow();
 
         var messages = entitiesWithEvents
-            .SelectMany(entity => entity.DomainEvents.Select(domainEvent => OutboxMessage.Create(
-                domainEvent.GetType().AssemblyQualifiedName!,
-                JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), OutboxJsonOptions.Default),
-                utcNow)))
+            .SelectMany(entity => entity.DomainEvents.Select(domainEvent => OutboxMessageFactory.Create(domainEvent, utcNow)))
             .ToList();
 
         dbContext.Set<OutboxMessage>().AddRange(messages);

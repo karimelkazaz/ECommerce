@@ -1,0 +1,18 @@
+services:
+  ecommerce-api:
+    image: ecommerce-api:dev
+    build:
+      context: .
+      dockerfile: src/ECommerce.Api/Dockerfile
+      args:
+        - configuration=Debug
+    ports:
+      - "5000:5000"
+    environment:
+      JWT__ISSUER: ${JWT__ISSUER}
+      JWT__AUDIENCE: ${JWT__AUDIENCE}
+      JWT__SECRETKEY: ${JWT__SECRETKEY:?JWT__SECRETKEY must be set in .env}
+      JWT__EXPIRATIONMINUTES: ${JWT__EXPIRATIONMINUTES:-120}
+      JWT__REFRESHTOKENEXPIRATIONDAYS: ${JWT__REFRESHTOKENEXPIRATIONDAYS:-30}
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw

@@ -382,5 +382,10 @@ public class DeliveryMethodApplicationTests
     {
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(1);
+
+        public Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> action,
+            CancellationToken cancellationToken = default)
+            => action(cancellationToken);
     }
 }

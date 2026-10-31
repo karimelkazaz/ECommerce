@@ -10,10 +10,16 @@ public sealed class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMe
     {
         builder.ToTable("InboxMessages");
 
-        builder.HasKey(m => m.Id);
+        builder.HasKey(m => new { m.MessageId, m.Consumer });
+
+        builder.Property(m => m.Consumer)
+            .IsRequired()
+            .HasMaxLength(200);
 
         builder.Property(m => m.EventType)
             .IsRequired()
             .HasMaxLength(500);
+
+        builder.HasIndex(m => m.ConsumedOnUtc);
     }
 }

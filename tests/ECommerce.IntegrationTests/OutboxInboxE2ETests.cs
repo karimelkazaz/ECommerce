@@ -1,5 +1,7 @@
 using ECommerce.Application;
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.Products.Events;
 using ECommerce.Domain.Entities.ProductsBrand;
@@ -31,6 +33,8 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        CountingClaimHandler.AppliedCount = 0;
+
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -142,7 +146,9 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
             var dbContext = assertScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var inboxMessage = await dbContext.InboxMessages.AsNoTracking()
-                .SingleAsync(m => m.Id == outboxMessageId);
+                .SingleAsync(m =>
+                    m.MessageId == outboxMessageId &&
+                    m.Consumer == CountingClaimHandler.Consumer);
             Assert.Equal(expectedEventType, inboxMessage.EventType);
         }
 
@@ -154,7 +160,11 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
         await using (var assertScope = _provider.CreateAsyncScope())
         {
             var dbContext = assertScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Assert.Equal(1, await dbContext.InboxMessages.CountAsync(m => m.Id == outboxMessageId));
+            Assert.Equal(1, await dbContext.InboxMessages.CountAsync(m => m.MessageId == outboxMessageId));
+
+            var outboxMessage = await dbContext.OutboxMessages.AsNoTracking()
+                .SingleAsync(m => m.Id == outboxMessageId);
+            Assert.Equal(OutboxMessageStatus.Processed, outboxMessage.Status);
         }
     }
 
@@ -165,6 +175,7 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
         var processor = new OutboxProcessor(
             _provider.GetRequiredService<IServiceScopeFactory>(),
             _provider.GetRequiredService<IOptions<OutboxOptions>>(),
+            _provider.GetRequiredService<TimeProvider>(),
             _provider.GetRequiredService<ILogger<OutboxProcessor>>());
 
         using var cts = new CancellationTokenSource();
@@ -219,17 +230,29 @@ public sealed class OutboxInboxE2ETests : IAsyncLifetime
     }
 }
 
-public sealed class CountingClaimHandler(IInbox inbox) : INotificationHandler<ProductCreatedDomainEvent>
+public sealed class CountingClaimHandler(
+    IInbox inbox,
+    IUnitOfWork unitOfWork,
+    IOutboxMessageContext messageContext,
+    ILogger<CountingClaimHandler> logger)
+    : IdempotentNotificationHandler<ProductCreatedDomainEvent>(
+        inbox,
+        unitOfWork,
+        messageContext,
+        logger)
 {
+    public const string Consumer = "tests.counting-claim";
+
     public static int AppliedCount;
 
-    public async Task Handle(ProductCreatedDomainEvent notification, CancellationToken cancellationToken)
-    {
-        if (!await inbox.TryClaimAsync(cancellationToken))
-        {
-            return;
-        }
+    protected override string ConsumerId => Consumer;
 
+    protected override Task HandleCore(
+        ProductCreatedDomainEvent notification,
+        CancellationToken cancellationToken)
+    {
         Interlocked.Increment(ref AppliedCount);
+
+        return Task.CompletedTask;
     }
 }

@@ -31,6 +31,42 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     IQueryable<Order> IApplicationDbContext.Orders => OrdersSet.AsNoTracking();
     IQueryable<UserAddress> IApplicationDbContext.UserAddresses => UserAddresses.AsNoTracking();
 
+    public async Task ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (Database.CurrentTransaction is not null)
+        {
+            throw new InvalidOperationException(
+                "A transaction is already active. Consumers must not nest transactions.");
+        }
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            await action(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            catch
+            {
+                // Preserve the original failure. Disposing the transaction will
+                // roll it back if it is still active.
+            }
+
+            ChangeTracker.Clear();
+            throw;
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

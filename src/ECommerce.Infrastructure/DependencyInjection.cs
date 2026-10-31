@@ -34,18 +34,29 @@ namespace ECommerce.Infrastructure
     {
         public static IServiceCollection AddInfrastructure(
             this IServiceCollection services,
-            IConfiguration configuration,
-            bool enableSensitiveDataLogging = false)
+            IConfiguration configuration
+            )
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection")
                       ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
 
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddSingleton(TimeProvider.System);
 
             services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
             services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
             services.Configure<OtpOptions>(configuration.GetSection(OtpOptions.SectionName));
+
+            services.AddOptions<InboxOptions>()
+                .Bind(configuration.GetSection(InboxOptions.SectionName))
+                .Validate(
+                    options => options.RetentionDays > 0,
+                    "Inbox:RetentionDays must be greater than zero.")
+                .Validate(
+                    options => options.CleanupIntervalMinutes > 0,
+                    "Inbox:CleanupIntervalMinutes must be greater than zero.")
+                .ValidateOnStart();
 
             services
                 .AddIdentityCore<ApplicationUser>(options =>
@@ -65,9 +76,17 @@ namespace ECommerce.Infrastructure
                 .AddDefaultTokenProviders()
                 .AddSignInManager();
 
-            var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-                ?? throw new InvalidOperationException("JWT settings are missing. Configure the 'Jwt' section.");
+var jwtSection = configuration.GetSection(JwtOptions.SectionName);
 
+if (!jwtSection.Exists())
+{
+    throw new InvalidOperationException(
+        $"JWT section is missing. Environment: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}. " +
+        $"ContentRoot: {configuration["ContentRoot"] ?? "Not configured"}");
+}
+
+var jwtOptions = jwtSection.Get<JwtOptions>()
+    ?? throw new InvalidOperationException("JWT section exists but binding failed.");
             if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Length < 32)
             {
                 throw new InvalidOperationException(
@@ -128,10 +147,6 @@ namespace ECommerce.Infrastructure
                        sql.MigrationsHistoryTable("__IdentityMigrationsHistory", "identity"))
                     .AddInterceptors(softDeleteInterceptor, auditInterceptor);
 
-                if (enableSensitiveDataLogging)
-                {
-                    options.EnableSensitiveDataLogging();
-                }
             });
 
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
@@ -144,15 +159,14 @@ namespace ECommerce.Infrastructure
                        sql.MigrationsHistoryTable("__ApplicationMigrationsHistory", "app"))
                     .AddInterceptors(outboxInterceptor, softDeleteInterceptor, auditInterceptor);
 
-                if (enableSensitiveDataLogging)
-                {
-                    options.EnableSensitiveDataLogging();
-                }
             });
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddScoped<IInbox, Inbox>();
+            services.AddScoped<OutboxMessageContext>();
+            services.AddScoped<IOutboxMessageContext>(sp => sp.GetRequiredService<OutboxMessageContext>());
+            services.AddScoped<IOutboxWriter, OutboxWriter>();
 
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
@@ -170,6 +184,8 @@ namespace ECommerce.Infrastructure
             services.AddScoped<DatabaseSeeder>();
 
             services.AddHostedService<OutboxProcessor>();
+            services.AddSingleton<InboxCleanupService>();
+            services.AddHostedService(sp => sp.GetRequiredService<InboxCleanupService>());
             AddBasketCaching(services, configuration);
 
             return services;

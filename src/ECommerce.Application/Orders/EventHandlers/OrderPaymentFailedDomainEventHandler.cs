@@ -1,21 +1,28 @@
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Orders.Events;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Application.Orders.EventHandlers;
 
-public sealed class OrderPaymentFailedDomainEventHandler(IInbox inbox, ILogger<OrderPaymentFailedDomainEventHandler> logger)
-    : INotificationHandler<OrderPaymentFailedDomainEvent>
+public sealed class OrderPaymentFailedDomainEventHandler(
+    IInbox inbox,
+    IUnitOfWork unitOfWork,
+    IOutboxMessageContext messageContext,
+    ILogger<OrderPaymentFailedDomainEventHandler> logger)
+    : IdempotentNotificationHandler<OrderPaymentFailedDomainEvent>(inbox, unitOfWork, messageContext, logger)
 {
-    public async Task Handle(OrderPaymentFailedDomainEvent notification, CancellationToken cancellationToken)
-    {
-        if (!await inbox.TryClaimAsync(cancellationToken))
-        {
-            logger.LogInformation("Suppressed duplicate delivery of OrderPaymentFailedDomainEvent.");
-            return;
-        }
+    protected override string ConsumerId => "orders.order-payment-failed";
 
-        logger.LogInformation("Payment failed for order {OrderId}.", notification.OrderId.Value);
+    protected override Task HandleCore(
+        OrderPaymentFailedDomainEvent notification,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation(
+            "Payment failed for order {OrderId}.",
+            notification.OrderId.Value);
+
+        return Task.CompletedTask;
     }
 }

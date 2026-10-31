@@ -1,21 +1,26 @@
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Orders.Events;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Application.Orders.EventHandlers;
 
-public sealed class OrderCreatedDomainEventHandler(IInbox inbox, ILogger<OrderCreatedDomainEventHandler> logger)
-    : INotificationHandler<OrderCreatedDomainEvent>
+public sealed class OrderCreatedDomainEventHandler(
+    IInbox inbox,
+    IUnitOfWork unitOfWork,
+    IOutboxMessageContext messageContext,
+    ILogger<OrderCreatedDomainEventHandler> logger)
+    : IdempotentNotificationHandler<OrderCreatedDomainEvent>(inbox, unitOfWork, messageContext, logger)
 {
-    public async Task Handle(OrderCreatedDomainEvent notification, CancellationToken cancellationToken)
-    {
-        if (!await inbox.TryClaimAsync(cancellationToken))
-        {
-            logger.LogInformation("Suppressed duplicate delivery of OrderCreatedDomainEvent.");
-            return;
-        }
+    protected override string ConsumerId => "orders.order-created";
 
+    protected override Task HandleCore(
+        OrderCreatedDomainEvent notification,
+        CancellationToken cancellationToken)
+    {
         logger.LogInformation("Order {OrderId} was created.", notification.OrderId.Value);
+
+        return Task.CompletedTask;
     }
 }

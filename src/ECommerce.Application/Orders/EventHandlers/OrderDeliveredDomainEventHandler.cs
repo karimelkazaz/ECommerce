@@ -1,21 +1,26 @@
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Orders.Events;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Application.Orders.EventHandlers;
 
-public sealed class OrderDeliveredDomainEventHandler(IInbox inbox, ILogger<OrderDeliveredDomainEventHandler> logger)
-    : INotificationHandler<OrderDeliveredDomainEvent>
+public sealed class OrderDeliveredDomainEventHandler(
+    IInbox inbox,
+    IUnitOfWork unitOfWork,
+    IOutboxMessageContext messageContext,
+    ILogger<OrderDeliveredDomainEventHandler> logger)
+    : IdempotentNotificationHandler<OrderDeliveredDomainEvent>(inbox, unitOfWork, messageContext, logger)
 {
-    public async Task Handle(OrderDeliveredDomainEvent notification, CancellationToken cancellationToken)
-    {
-        if (!await inbox.TryClaimAsync(cancellationToken))
-        {
-            logger.LogInformation("Suppressed duplicate delivery of OrderDeliveredDomainEvent.");
-            return;
-        }
+    protected override string ConsumerId => "orders.order-delivered";
 
+    protected override Task HandleCore(
+        OrderDeliveredDomainEvent notification,
+        CancellationToken cancellationToken)
+    {
         logger.LogInformation("Order {OrderId} was delivered.", notification.OrderId.Value);
+
+        return Task.CompletedTask;
     }
 }

@@ -1,0 +1,74 @@
+name: ecommerce
+
+services:
+  ecommerce-api:
+    build:
+      context: .
+      dockerfile: src/ECommerce.Api/Dockerfile
+    container_name: ecommerce-api
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ecommerce-sqlserver
+    env_file:
+      - .env
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD}
+      - MSSQL_PID=Developer
+      - JWT__ISSUER: ${JWT__ISSUER}
+      - JWT__AUDIENCE: ${JWT__AUDIENCE}
+      - JWT__SECRETKEY: ${JWT__SECRETKEY:?JWT__SECRETKEY must be set in .env}
+      - JWT__EXPIRATIONMINUTES: ${JWT__EXPIRATIONMINUTES:-120}
+      - JWT__REFRESHTOKENEXPIRATIONDAYS: ${JWT__REFRESHTOKENEXPIRATIONDAYS:-30}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+  redis_data:

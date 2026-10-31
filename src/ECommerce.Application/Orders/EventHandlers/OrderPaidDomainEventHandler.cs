@@ -1,21 +1,26 @@
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
+using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Orders.Events;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Application.Orders.EventHandlers;
 
-public sealed class OrderPaidDomainEventHandler(IInbox inbox, ILogger<OrderPaidDomainEventHandler> logger)
-    : INotificationHandler<OrderPaidDomainEvent>
+public sealed class OrderPaidDomainEventHandler(
+    IInbox inbox,
+    IUnitOfWork unitOfWork,
+    IOutboxMessageContext messageContext,
+    ILogger<OrderPaidDomainEventHandler> logger)
+    : IdempotentNotificationHandler<OrderPaidDomainEvent>(inbox, unitOfWork, messageContext, logger)
 {
-    public async Task Handle(OrderPaidDomainEvent notification, CancellationToken cancellationToken)
-    {
-        if (!await inbox.TryClaimAsync(cancellationToken))
-        {
-            logger.LogInformation("Suppressed duplicate delivery of OrderPaidDomainEvent.");
-            return;
-        }
+    protected override string ConsumerId => "orders.order-paid";
 
+    protected override Task HandleCore(
+        OrderPaidDomainEvent notification,
+        CancellationToken cancellationToken)
+    {
         logger.LogInformation("Order {OrderId} was paid.", notification.OrderId.Value);
+
+        return Task.CompletedTask;
     }
 }

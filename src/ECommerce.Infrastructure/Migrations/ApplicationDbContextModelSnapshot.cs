@@ -347,9 +347,12 @@ namespace ECommerce.Infrastructure.Migrations
 
             modelBuilder.Entity("ECommerce.Infrastructure.Persistence.Inbox.InboxMessage", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid>("MessageId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Consumer")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTimeOffset>("ConsumedOnUtc")
                         .HasColumnType("datetimeoffset");
@@ -359,7 +362,9 @@ namespace ECommerce.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.HasKey("Id");
+                    b.HasKey("MessageId", "Consumer");
+
+                    b.HasIndex("ConsumedOnUtc");
 
                     b.ToTable("InboxMessages", (string)null);
                 });

@@ -13,8 +13,7 @@ public sealed record RegisterCommand(
     string Password) : IRequest<Result<EmailSentResponse>>;
 
 public sealed class RegisterCommandHandler(
-    IIdentityService identityService,
-    IOtpService otpService) : IRequestHandler<RegisterCommand, Result<EmailSentResponse>>
+    IIdentityService identityService) : IRequestHandler<RegisterCommand, Result<EmailSentResponse>>
 {
     public const string RegisteredMessage =
         "Registration successful. A verification code was sent to your email. Confirm your email before logging in.";
@@ -33,11 +32,7 @@ public sealed class RegisterCommandHandler(
                 return Result.Failure<EmailSentResponse>(AuthErrors.EmailAlreadyRegistered);
             }
 
-            return await SendVerificationAsync(
-                email,
-                verificationCodeResent: true,
-                UnconfirmedResendMessage,
-                cancellationToken);
+            return new EmailSentResponse(email, true, UnconfirmedResendMessage);
         }
 
         var createResult = await identityService.CreateUserAsync(
@@ -52,27 +47,7 @@ public sealed class RegisterCommandHandler(
             return Result.Failure<EmailSentResponse>(createResult.Error);
         }
 
-        return await SendVerificationAsync(
-            email,
-            verificationCodeResent: false,
-            RegisteredMessage,
-            cancellationToken);
-    }
-
-    private async Task<Result<EmailSentResponse>> SendVerificationAsync(
-        string email,
-        bool verificationCodeResent,
-        string message,
-        CancellationToken cancellationToken)
-    {
-        var sendResult = await otpService.SendOtpAsync(email, OtpPurpose.EmailVerification, cancellationToken);
-
-        if (sendResult.IsFailure)
-        {
-            return Result.Failure<EmailSentResponse>(sendResult.Error);
-        }
-
-        return new EmailSentResponse(email, verificationCodeResent, message);
+        return new EmailSentResponse(email, false, RegisteredMessage);
     }
 }
 

@@ -6,13 +6,14 @@ using ECommerce.Api.ExceptionHandlers;
 using ECommerce.Application;
 using ECommerce.Infrastructure;
 using ECommerce.Infrastructure.Persistence.Seeding;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.IsDevelopment());
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services
     .AddApiVersioning(options =>
@@ -24,8 +25,32 @@ builder.Services
     {
         options.GroupNameFormat = "'v'V";
         options.SubstituteApiVersionInUrl = true;
-    })
-    .AddOpenApi();
+    });
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your JWT access token."
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "ECommerce API",
+        Version = "v1",
+        Description = "ECommerce API documentation"
+    });
+});
 
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -39,22 +64,32 @@ builder.Services.AddProblemDetails(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+
+app.UseSwaggerUI(options =>
 {
-    app.MapOpenApi().WithDocumentPerVersion();
+    options.SwaggerEndpoint(
+        "/swagger/v1/swagger.json",
+        "ECommerce API v1");
 
-    await using var scope = app.Services.CreateAsyncScope();
-    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    options.RoutePrefix = "swagger";
+});
 
-    try
-    {
-        await seeder.SeedAll();
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Database seeding failed. Make sure the database exists and is reachable.");
-    }
+// if (app.Environment.IsDevelopment())
+// {
+
+await using var scope = app.Services.CreateAsyncScope();
+var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+
+try
+{
+    await seeder.SeedAll();
 }
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Database seeding failed. Make sure the database exists and is reachable.");
+}
+// }
 
 app.UseExceptionHandler();
 

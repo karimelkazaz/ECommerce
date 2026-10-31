@@ -1,6 +1,8 @@
+using ECommerce.Application.Common.EventHandlers;
 using ECommerce.Application.Common.Interfaces;
 using ECommerce.Domain.Common;
 using ECommerce.Infrastructure.Persistence.Repositories;
+using MediatR;
 using NetArchTest.Rules;
 using Xunit;
 
@@ -23,6 +25,40 @@ public class ConventionTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, DescribeFailures(result));
+    }
+
+    [Fact]
+    public void NotificationHandlers_Should_DeriveFrom_IdempotentNotificationHandler()
+    {
+        var handlerInterface = typeof(INotificationHandler<>);
+        var idempotentBaseType = typeof(IdempotentNotificationHandler<>);
+
+        var offenders = typeof(IApplicationDbContext).Assembly
+            .GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .Where(type => type.GetInterfaces().Any(
+                candidate =>
+                    candidate.IsGenericType &&
+                    candidate.GetGenericTypeDefinition() == handlerInterface))
+            .Where(type => !DerivesFromOpenGeneric(type, idempotentBaseType))
+            .Select(type => type.FullName)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    private static bool DerivesFromOpenGeneric(Type type, Type openGenericType)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType &&
+                current.GetGenericTypeDefinition() == openGenericType)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [Fact]

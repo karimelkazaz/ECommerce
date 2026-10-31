@@ -1,4 +1,5 @@
 using ECommerce.Api.Common;
+using ECommerce.Application.Auth;
 using ECommerce.Application.Auth.Commands;
 using ECommerce.Application.Auth.Queries;
 using MediatR;
@@ -27,9 +28,18 @@ public static class AuthEndpoints
     {
         var result = await sender.Send(command, ct);
 
-        return result.IsSuccess
+        if (result.IsFailure)
+        {
+            return result.ToProblemDetails();
+        }
+
+        var otpResult = await sender.Send(
+            new SendOtpCommand(result.Value.Email, OtpPurpose.EmailVerification),
+            ct);
+
+        return otpResult.IsSuccess
             ? Results.Ok(result.Value)
-            : result.ToProblemDetails();
+            : otpResult.ToProblemDetails();
     }
 
     private static async Task<IResult> Login(LoginQuery query, ISender sender, CancellationToken ct)
