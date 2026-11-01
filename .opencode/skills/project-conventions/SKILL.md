@@ -128,5 +128,9 @@ of exactly three forms:
   `dotnet test` on `ECommerce.Domain.UnitTests`, the affected `ECommerce.IntegrationTests`
   filters (full integration suite needs the compose databases — don't assume it runs),
   and `ECommerce.ArchitectureTests`.
+- If a build fails with "file is being used by another process" (MSB3027-style),
+  run `scripts\dev-clean.ps1` first: it stops leftover dev-server / testhost processes
+  (including agent-session copies under `%TEMP%\ECommerce-*`), shuts down stale
+  MSBuild/Roslyn build servers, and with `-Build` rebuilds in one step.
 - Build warnings from `System.Security.Cryptography.Pkcs` (NU1902/NU1903) are known and
   unrelated; don't chase them in ordinary changes.

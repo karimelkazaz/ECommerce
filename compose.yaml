@@ -7,7 +7,25 @@ services:
       dockerfile: src/ECommerce.Api/Dockerfile
     container_name: ecommerce-api
     env_file:
-      - .env
+      - path: .env
+        required: false
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=ECommerce;User Id=sa;Password=${SA_PASSWORD:?SA_PASSWORD must be set in .env};TrustServerCertificate=True;MultipleActiveResultSets=True;
+      - ConnectionStrings__Redis=redis:6379
+      - JWT__ISSUER=${JWT__ISSUER:-ECommerce.Api}
+      - JWT__AUDIENCE=${JWT__AUDIENCE:-ECommerce.Clients}
+      - JWT__SECRETKEY=${JWT__SECRETKEY:?JWT__SECRETKEY must be set in .env}
+      - JWT__EXPIRATIONMINUTES=${JWT__EXPIRATIONMINUTES:-120}
+      - JWT__REFRESHTOKENEXPIRATIONDAYS=${JWT__REFRESHTOKENEXPIRATIONDAYS:-30}
+      - Stripe__SecretKey=${Stripe__SecretKey:-}
+      - Stripe__WebhookSecret=${Stripe__WebhookSecret:-}
+      - Stripe__PublishableKey=${Stripe__PublishableKey:-}
+      - Smtp__Host=${Smtp__Host:-}
+      - Smtp__Port=${Smtp__Port:-587}
+      - Smtp__FromEmail=${Smtp__FromEmail:-}
+      - Smtp__FromName=${Smtp__FromName:-ECommerce}
+      - Smtp__Username=${Smtp__Username:-}
+      - Smtp__Password=${Smtp__Password:-}
     ports:
       - "5000:5000"
     depends_on:
@@ -22,23 +40,16 @@ services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: ecommerce-sqlserver
-    env_file:
-      - .env
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${SA_PASSWORD}
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD:?SA_PASSWORD must be set in .env}
       - MSSQL_PID=Developer
-      - JWT__ISSUER: ${JWT__ISSUER}
-      - JWT__AUDIENCE: ${JWT__AUDIENCE}
-      - JWT__SECRETKEY: ${JWT__SECRETKEY:?JWT__SECRETKEY must be set in .env}
-      - JWT__EXPIRATIONMINUTES: ${JWT__EXPIRATIONMINUTES:-120}
-      - JWT__REFRESHTOKENEXPIRATIONDAYS: ${JWT__REFRESHTOKENEXPIRATIONDAYS:-30}
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
