@@ -33,7 +33,7 @@ public sealed class UpdateBasketItemQuantityCommandHandler(
 
         await basketStore.SaveAsync(basket, cancellationToken);
 
-        return BasketResponse.FromDomain(basket);
+        return Result.Success(BasketResponse.FromDomain(basket));
     }
 }
 

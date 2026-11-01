@@ -108,12 +108,6 @@ public sealed class OtpService(
         return Result.Success();
     }
 
-    public async Task<Result> VerifyOtpAsync(string email, string code, OtpPurpose purpose, CancellationToken ct)
-    {
-        var (result, _) = await VerifyCoreAsync(email, code, purpose, ct);
-        return result;
-    }
-
     public async Task<Result> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

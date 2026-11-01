@@ -42,7 +42,7 @@ public sealed class AddItemToBasketCommandHandler(
 
         await basketStore.SaveAsync(basket, cancellationToken);
 
-        return BasketResponse.FromDomain(basket);
+        return Result.Success(BasketResponse.FromDomain(basket));
     }
 }
 

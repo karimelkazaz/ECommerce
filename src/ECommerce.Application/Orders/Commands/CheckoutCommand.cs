@@ -148,13 +148,15 @@ public sealed class CheckoutCommandHandler(
         basket.Clear();
         await basketStore.SaveAsync(basket, cancellationToken);
 
-        return new CheckoutResponse(
+        var response = new CheckoutResponse(
             order.Id.Value,
             order.Status.ToString(),
             order.Total.Amount,
             order.Total.Currency.Code,
             intentResult.Value.PaymentIntentId,
             intentResult.Value.ClientSecret);
+
+        return Result.Success(response);
     }
 }
 

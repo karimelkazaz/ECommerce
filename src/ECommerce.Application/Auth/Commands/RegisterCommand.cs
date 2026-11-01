@@ -32,7 +32,7 @@ public sealed class RegisterCommandHandler(
                 return Result.Failure<EmailSentResponse>(AuthErrors.EmailAlreadyRegistered);
             }
 
-            return new EmailSentResponse(email, true, UnconfirmedResendMessage);
+            return Result.Success(new EmailSentResponse(email, true, UnconfirmedResendMessage));
         }
 
         var createResult = await identityService.CreateUserAsync(
@@ -47,7 +47,7 @@ public sealed class RegisterCommandHandler(
             return Result.Failure<EmailSentResponse>(createResult.Error);
         }
 
-        return new EmailSentResponse(email, false, RegisteredMessage);
+        return Result.Success(new EmailSentResponse(email, false, RegisteredMessage));
     }
 }
 

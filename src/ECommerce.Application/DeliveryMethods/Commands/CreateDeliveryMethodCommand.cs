@@ -43,7 +43,7 @@ public sealed class CreateDeliveryMethodCommandHandler(
         deliveryMethods.Add(deliveryMethod);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new DeliveryMethodResponse(
+        var response = new DeliveryMethodResponse(
             deliveryMethod.Id.Value,
             deliveryMethod.Name,
             deliveryMethod.DeliveryTime,
@@ -51,6 +51,8 @@ public sealed class CreateDeliveryMethodCommandHandler(
             deliveryMethod.Price.Currency.Code,
             deliveryMethod.Description,
             deliveryMethod.IsAvailable);
+
+        return Result.Success(response);
     }
 }
 

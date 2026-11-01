@@ -65,7 +65,7 @@ public sealed class UpdateUserAddressCommandHandler(
         userAddress.SetDefault(request.IsDefault);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return UserAddressResponse.FromDomain(userAddress);
+        return Result.Success(UserAddressResponse.FromDomain(userAddress));
     }
 }
 

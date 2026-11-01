@@ -35,6 +35,12 @@ public static class AuthErrors
     public static readonly Error PasswordChangeFailed =
         new("Auth.PasswordChangeFailed", "Could not update the password.", ErrorType.Problem);
 
+    public static readonly Error UserNotFound =
+        new("Auth.UserNotFound", "User was not found.", ErrorType.NotFound);
+
+    public static readonly Error ProfileUpdateFailed =
+        new("Auth.ProfileUpdateFailed", "Could not update the profile. Please try again.", ErrorType.Problem);
+
     public static readonly Error EmailNotConfirmed =
         new("Auth.EmailNotConfirmed", "Confirm your e-mail address before signing in.", ErrorType.Unauthorized);
 }

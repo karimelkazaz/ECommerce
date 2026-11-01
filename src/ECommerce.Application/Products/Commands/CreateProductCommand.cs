@@ -63,7 +63,7 @@ public sealed class CreateProductCommandHandler(
         products.Add(product);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new ProductResponse(
+        var response = new ProductResponse(
             product.Id.Value,
             product.Name,
             product.Description,
@@ -72,6 +72,8 @@ public sealed class CreateProductCommandHandler(
             product.Price.Currency.Code,
             brand.Name,
             type.Name);
+
+        return Result.Success(response);
     }
 }
 

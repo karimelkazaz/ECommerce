@@ -23,7 +23,7 @@ public sealed class CreateTypeCommandHandler(
         types.Add(type);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new TypeResponse(type.Id.Value, type.Name);
+        return Result.Success(new TypeResponse(type.Id.Value, type.Name));
     }
 }
 

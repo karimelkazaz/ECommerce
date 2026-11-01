@@ -63,7 +63,7 @@ public sealed class AddUserAddressCommandHandler(
         userAddresses.Add(createResult.Value);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return UserAddressResponse.FromDomain(createResult.Value);
+        return Result.Success(UserAddressResponse.FromDomain(createResult.Value));
     }
 }
 

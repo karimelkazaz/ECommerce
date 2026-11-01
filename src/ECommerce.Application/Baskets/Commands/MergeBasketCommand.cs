@@ -40,7 +40,7 @@ public sealed class MergeBasketCommandHandler(
             await basketStore.DeleteAsync(request.SourceUserId, cancellationToken);
         }
 
-        return BasketResponse.FromDomain(destinationBasket);
+        return Result.Success(BasketResponse.FromDomain(destinationBasket));
     }
 }
 

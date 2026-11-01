@@ -94,6 +94,12 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
                     "JWT settings are invalid. 'Jwt:SecretKey' must be at least 32 characters long.");
             }
 
+            if (jwtOptions.RefreshTokenExpirationDays <= 0)
+            {
+                throw new InvalidOperationException(
+                    "JWT settings are invalid. 'Jwt:RefreshTokenExpirationDays' must be positive.");
+            }
+
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {

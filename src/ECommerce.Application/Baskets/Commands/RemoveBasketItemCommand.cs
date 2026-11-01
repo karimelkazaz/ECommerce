@@ -32,7 +32,7 @@ public sealed class RemoveBasketItemCommandHandler(
 
         await basketStore.SaveAsync(basket, cancellationToken);
 
-        return BasketResponse.FromDomain(basket);
+        return Result.Success(BasketResponse.FromDomain(basket));
     }
 }
 

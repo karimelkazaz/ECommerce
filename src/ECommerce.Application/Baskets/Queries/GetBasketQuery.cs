@@ -19,7 +19,7 @@ public sealed class GetBasketQueryHandler(
             return Result.Failure<BasketResponse>(BasketErrors.InvalidUserId);
 
         var basket = await basketStore.GetOrCreateAsync(userId.Value, cancellationToken);
-        return BasketResponse.FromDomain(basket);
+        return Result.Success(BasketResponse.FromDomain(basket));
     }
 }
 

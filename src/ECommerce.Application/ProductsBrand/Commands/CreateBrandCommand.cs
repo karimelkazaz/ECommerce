@@ -23,7 +23,7 @@ public sealed class CreateBrandCommandHandler(
         brands.Add(brand);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new BrandResponse(brand.Id.Value, brand.Name);
+        return Result.Success(new BrandResponse(brand.Id.Value, brand.Name));
     }
 }
 

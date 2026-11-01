@@ -96,7 +96,7 @@ ASP.NET Core Identity with users/roles stored in SQL Server (`app` schema), JWT 
 - **Verified registration** — `POST /api/auth/register` creates the user with `EmailConfirmed = false` and returns no tokens; a 6-digit OTP is emailed. `POST /api/auth/confirm-email` verifies it, after which login succeeds. Until confirmed, login returns `401` `Auth.EmailNotConfirmed`; re-registering an unconfirmed email resends a new code.
 - **Access tokens** — JWT HS256, 2-hour expiry, carrying user id, email, name, and roles.
 - **Refresh tokens** — 30-day expiry, stored **hashed** (SHA-256), **single-use with rotation** (the used token is revoked and a new one issued), and revocable (`/api/v1/auth/revoke`). Reusing an already-rotated token returns `401`.
-- **OTP** — hashed at rest, 5-minute expiry, 5 failed-attempt lockout, single-use. Serves two purposes: `EmailVerification` (confirm-email) and `PasswordReset` (reset-password flow: `send-otp` → `verify-otp` → `reset-password`).
+- **OTP** — hashed at rest, 5-minute expiry, 5 failed-attempt lockout, single-use. Serves two purposes: `EmailVerification` (confirm-email) and `PasswordReset` (reset-password flow: `send-otp` → `reset-password`; the reset operation verifies and consumes the code).
 - **Email delivery** — MailKit/SMTP when `Smtp:Host` is configured; otherwise development falls back to the console-logging sender (OTP codes are printed in the logs).
 - **Default admin** —  Default admin is seeded in development alongside the catalog reference data.
 
@@ -250,11 +250,13 @@ Webhook handling is idempotent: late/duplicate events cannot overwrite a later l
 | POST | `/api/v1/auth/register` | Register (unconfirmed) → `{ email, verificationCodeResent, message }`, no tokens |
 | POST | `/api/v1/auth/confirm-email` | Confirm email with the emailed OTP → `204` |
 | POST | `/api/v1/auth/login` | Login (confirmed users) → access + refresh tokens |
+| GET | `/api/v1/auth/me` | **Auth** — current user's profile → `{ userId, firstName, lastName, email, roles }` |
+| PUT | `/api/v1/auth/me` | **Auth** — update the current user's first/last name → updated profile |
 | POST | `/api/v1/auth/refresh` | Rotate refresh token → new token pair |
 | POST | `/api/v1/auth/revoke` | Revoke refresh token → `204` |
+| POST | `/api/v1/auth/logout` | Revoke refresh token and log out → `204` |
 | POST | `/api/v1/auth/send-otp` | Send OTP for `EmailVerification` or `PasswordReset` |
-| POST | `/api/v1/auth/verify-otp` | Verify an OTP |
-| POST | `/api/v1/auth/reset-password` | Reset password using a verified OTP → `204` |
+| POST | `/api/v1/auth/reset-password` | Verify the password-reset OTP and reset the password → `204` |
 
 Errors are returned as RFC 7807 ProblemDetails, including validation errors and auth failures (e.g., `401 Auth.EmailNotConfirmed`).
 

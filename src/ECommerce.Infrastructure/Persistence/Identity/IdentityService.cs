@@ -5,6 +5,7 @@ using ECommerce.Domain.Entities.RefreshTokens;
 using ECommerce.Infrastructure.Persistence.DbContexts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ECommerce.Infrastructure.Persistence.Identity;
@@ -14,7 +15,8 @@ public sealed class IdentityService(
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
     AppIdentityDbContext dbContext,
-    IOptions<JwtOptions> jwtOptions) : IIdentityService
+    IOptions<JwtOptions> jwtOptions,
+    ILogger<IdentityService> logger) : IIdentityService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
 
@@ -65,7 +67,17 @@ public sealed class IdentityService(
         var roleResult = await userManager.AddToRoleAsync(user, Roles.Customer);
         if (!roleResult.Succeeded)
         {
-            await userManager.DeleteAsync(user);
+            // Compensating delete: never leave a user without their role behind.
+            var deleteResult = await userManager.DeleteAsync(user);
+            if (!deleteResult.Succeeded)
+            {
+                logger.LogError(
+                    "Compensating delete failed for user {UserId} ({Email}) after role assignment failure: {Errors}",
+                    user.Id,
+                    user.Email,
+                    string.Join("; ", deleteResult.Errors.Select(e => $"{e.Code}: {e.Description}")));
+            }
+
             return Result.Failure(AuthErrors.RoleAssignmentFailed);
         }
 
@@ -82,7 +94,7 @@ public sealed class IdentityService(
             return Result.Failure<AuthResponse>(AuthErrors.InvalidCredentials);
         }
 
-        var signInResult = await signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: false);
+        var signInResult = await signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
 
         if (signInResult.IsLockedOut)
         {
@@ -100,6 +112,47 @@ public sealed class IdentityService(
         }
 
         return await CreateAuthResponseAsync(user, ct);
+    }
+
+    public async Task<Result<UserProfileResponse>> GetUserProfileAsync(Guid userId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(AuthErrors.UserNotFound);
+        }
+
+        var profile = await BuildProfileAsync(user);
+        return Result.Success(profile);
+    }
+
+    public async Task<Result<UserProfileResponse>> UpdateUserProfileAsync(
+        Guid userId,
+        string firstName,
+        string lastName,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(AuthErrors.UserNotFound);
+        }
+
+        user.FirstName = firstName;
+        user.LastName = lastName;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure<UserProfileResponse>(AuthErrors.ProfileUpdateFailed);
+        }
+
+        var profile = await BuildProfileAsync(user);
+        return Result.Success(profile);
     }
 
     public async Task<Result<AuthResponse>> RefreshTokenAsync(string refreshToken, CancellationToken ct)
@@ -142,7 +195,7 @@ public sealed class IdentityService(
         var accessToken = tokenService.CreateAccessToken(user, roles.ToArray());
         var issued = await IssueRefreshTokenAsync(user.Id, ct);
 
-        return new AuthResponse(
+        return Result.Success(new AuthResponse(
             user.Id,
             user.FirstName,
             user.LastName,
@@ -151,7 +204,7 @@ public sealed class IdentityService(
             accessToken.Token,
             accessToken.ExpiresAtUtc,
             issued.Token,
-            issued.ExpiresOnUtc);
+            issued.ExpiresOnUtc));
     }
 
     public async Task<Result> RevokeRefreshTokenAsync(string refreshToken, CancellationToken ct)
@@ -176,6 +229,17 @@ public sealed class IdentityService(
         return Result.Success();
     }
 
+    private async Task<UserProfileResponse> BuildProfileAsync(ApplicationUser user)
+    {
+        var roles = await userManager.GetRolesAsync(user);
+        return new UserProfileResponse(
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.Email ?? string.Empty,
+            roles.ToArray());
+    }
+
     private async Task<Result<AuthResponse>> CreateAuthResponseAsync(ApplicationUser user, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -184,7 +248,7 @@ public sealed class IdentityService(
         var accessToken = tokenService.CreateAccessToken(user, roles.ToArray());
         var refreshToken = await IssueRefreshTokenAsync(user.Id, ct);
 
-        return new AuthResponse(
+        var response = new AuthResponse(
             user.Id,
             user.FirstName,
             user.LastName,
@@ -194,6 +258,8 @@ public sealed class IdentityService(
             accessToken.ExpiresAtUtc,
             refreshToken.Token,
             refreshToken.ExpiresOnUtc);
+
+        return Result.Success(response);
     }
 
     private async Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, CancellationToken ct)

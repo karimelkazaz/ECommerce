@@ -18,6 +18,14 @@ public interface IIdentityService
 
     Task<Result<AuthResponse>> LoginAsync(string email, string password, CancellationToken ct);
 
+    Task<Result<UserProfileResponse>> GetUserProfileAsync(Guid userId, CancellationToken ct);
+
+    Task<Result<UserProfileResponse>> UpdateUserProfileAsync(
+        Guid userId,
+        string firstName,
+        string lastName,
+        CancellationToken ct);
+
     Task<Result<AuthResponse>> RefreshTokenAsync(string refreshToken, CancellationToken ct);
 
     Task<Result> RevokeRefreshTokenAsync(string refreshToken, CancellationToken ct);
