@@ -13,6 +13,23 @@ Apply these to every change in this repo. The architecture tests in
 `tests/ECommerce.ArchitectureTests` enforce the structural rules; conventions
 below are the de facto style of the existing code.
 
+## Solution map
+
+Solution file: `ECommerce.slnx` (repo root; this is the file to build). All projects
+target `net10.0`. Repo root also holds `compose.yaml` / `compose.debug.yaml`, `.env.example`,
+`scripts/` and `dotnet-tools.json`.
+
+| Project | Path | Notes |
+|---|---|---|
+| `ECommerce.Domain` | `src/ECommerce.Domain` | Common/Abstractions, Entities/*, Repositories (interfaces only) |
+| `ECommerce.Application` | `src/ECommerce.Application` | Feature slices + `Common/Interfaces` abstractions + `Common/Behaviors`; wiring: root `DependencyInjection.cs` (`AddApplication`) |
+| `ECommerce.Infrastructure` | `src/ECommerce.Infrastructure` | Caching, Email, Payment, Persistence (DbContexts, Identity, Repositories, Interceptors, Outbox, Inbox, Seeding), Migrations; wiring: `DependencyInjection.cs` (`AddInfrastructure`) — the single service-wiring point for everything app-level |
+| `ECommerce.Api` | `src/ECommerce.Api` | `Endpoints/` (one static class per feature), `Common/` (`ResultExtensions`), `ExceptionHandlers/`; **no `DependencyInjection.cs`** — all Api-level registrations (HttpJson options, Asp.Versioning, Swashbuckle `AddSwaggerGen`, exception handlers, `AddProblemDetails`, health checks) live directly in `Program.cs` — follow that |
+| Tests | `tests/ECommerce.Domain.UnitTests`, `tests/ECommerce.ArchitectureTests`, `tests/ECommerce.IntegrationTests` | flat file layout; see Tests section |
+
+Dependency chain: Api → Infrastructure → Application → Domain (Api references only
+Infrastructure; it reaches Application types transitively).
+
 ## Layering
 
 ```
@@ -78,10 +95,14 @@ of exactly three forms:
 
 ## Minimal API endpoints
 
-- One static class per feature: `public static class XxxEndpoints` with
+- One static class per feature in `src/ECommerce.Api/Endpoints/` (`AuthEndpoints.cs`,
+  `ProductEndpoints.cs`, ...): `public static class XxxEndpoints` with
   `public static IEndpointRouteBuilder MapXxxEndpoints(this IEndpointRouteBuilder app)`,
-  mapped in `Api/Common`/`Program.cs`.
-- `app.MapGroup("/route").WithTags("Tag")`; per operation `.MapToApiVersion(1)`;
+  called from `Program.cs` on the versioned group:
+  `versionedApi.MapXxxEndpoints();`.
+- `Program.cs` builds the version set: group `api/v{version:apiVersion}`
+  (`UrlSegmentApiVersionReader`, default v1, `ReportApiVersions`). Feature files then do
+  `app.MapGroup("/route").WithTags("Tag")`; per operation `.MapToApiVersion(1)`;
   `.RequireAuthorization()` at group level (public group only → per endpoint instead,
   e.g. auth `/me` inside the anonymous `/auth` group).
 - Handlers are thin: `(CommandFromBody command, ISender sender, CancellationToken ct)`
@@ -89,7 +110,9 @@ of exactly three forms:
   (204-style side effects follow the existing endpoint: `Results.NoContent()`).
 - Request-bound records go at the bottom of the endpoint file; commands validate.
 - Adding a route → update the endpoint table in `README.md` (method, `/api/v1/...`,
-  one-line description, **Auth** marker when protected).
+  one-line description, **Auth** marker when protected); add a Tech Stack row for any
+  new package. Non-versioned root endpoints (e.g. `/health`) map directly on `app` —
+  outside the `api/v{version}` group, no auth middleware involvement.
 
 ## Options & configuration
 
@@ -98,7 +121,37 @@ of exactly three forms:
 - Fail fast at startup: extend the existing manual checks (JWT secret length,
   `RefreshTokenExpirationDays > 0`) or `.Validate(...).ValidateOnStart()` like `InboxOptions`.
   A bad value must crash startup, not throw mid-request.
-- Never store secrets in config files; use environment substitution.
+- Never store secrets in config files; use environment substitution. **No
+  `ConnectionStrings` live in any appsettings file** — they come from user-secrets
+  (`ECommerce.Api` `UserSecretsId: ecommerce-api-dev-secrets`) or environment variables
+  (compose sets `ConnectionStrings__DefaultConnection` / `ConnectionStrings__Redis`).
+  README tells manual setups to add them to `appsettings.json` themselves.
+  `.env` is compose-level values only (passwords, JWT secret, Stripe/SMTP) — never
+  put .NET settings in it: a differently-cased duplicate (e.g.
+  `CONNECTIONSTRINGS__REDIS`) is a *distinct* Linux env var that feeds the same
+  case-insensitive config key as the compose-injected `ConnectionStrings__Redis`,
+  racing with it nondeterministically (removed from the repo's `.env` for this reason).
+- Required connection strings: `DefaultConnection` (missing → `InvalidOperationException`,
+  shared by both contexts) and optional `Redis` — mirror `AddBasketCaching`'s
+  `IsNullOrWhiteSpace` guard: Redis must be optional, never a startup failure.
+- JWTs validate manually (section missing → throw with env + ContentRoot dump;
+  `SecretKey` ≥ 32 chars, `RefreshTokenExpirationDays > 0`). Email: SMTP sender only
+  when `Smtp:Host` is set, otherwise the console `LoggingEmailSender` fallback (dev OTPs
+  appear in logs).
+
+## Health checks
+
+- Registered in `Program.cs` right after `AddInfrastructure`: EF `DbContextCheck`s for
+  both `ApplicationDbContext` and `AppIdentityDbContext`, plus Redis **only when**
+  `ConnectionStrings:Redis` exists.
+- Single `GET /health` endpoint on `app` (not in the versioned group), responses written
+  by `UIResponseWriter.WriteHealthCheckUIResponse` from `AspNetCore.HealthChecks.UI.Client`
+  (HealthChecks.UI JSON format; consumable by a centralized UI dashboard). 200 when all
+  pass, 503 when any fail.
+- Package-version trap: method is `WriteHealthCheckUIResponse` in the published 9.0.0
+  package; the shorter `WriteUIHealthReport` name only exists on the repo's `master`.
+- When adding a new infrastructure dependency, register a matching health check and keep
+  the `/health` row in the README endpoint tables accurate.
 
 ## Identity specifics
 
@@ -113,9 +166,32 @@ of exactly three forms:
 
 ## Provider configuration & migrations
 
-- Persistence split across `AppDbContext` + `AppIdentityDbContext`; EF configurations in
-  `Persistence/Configurations`, migrations under each context's own folder.
-  Migrations via `dotnet ef` with `--context` when touching identity tables.
+- Provider is **SQL Server** (`UseSqlServer`), not Npgsql. Both contexts
+  (`ApplicationDbContext`, `AppIdentityDbContext` in
+  `Infrastructure/Persistence/DbContexts`) share `DefaultConnection` and each gets its
+  own migrations history table: `__ApplicationMigrationsHistory` in schema `app`,
+  `__IdentityMigrationsHistory` in schema `identity`.
+- Each `AddDbContext` wires the interceptor set explicitly per context: Outbox (app
+  context only), SoftDelete, Audit (app identity context: SoftDelete + Audit only).
+- EF configurations in `Persistence/Configurations`; migrations under each context's own
+  folder. Migrations via `dotnet ef` with `--context` when touching identity tables
+  (set `ASPNETCORE_ENVIRONMENT='Development'` first so the design-time host picks up
+  user-secrets).
+- `compose.yaml` (repo root): `ecommerce-api` (builds `src/ECommerce.Api/Dockerfile`,
+  port 5000:5000), `sqlserver` (`mcr.microsoft.com/mssql/server:2022-latest`) and
+  `redis` (`redis:7-alpine`) — both data services have compose-level `healthcheck`s
+  (`sqlcmd` for SQL Server, **authed** `redis-cli ... ping` since Redis runs with
+  `--requirepass`) and the api `depends_on` them with `condition: service_healthy`.
+  `SA_PASSWORD` and `REDIS_PASSWORD` are required — compose fails interpolation
+  without them. Redis auth is compose-only plumbing: app code just takes
+  `ConnectionStrings__Redis` (`redis:6379,password=...` in compose), and Redis stays
+  optional for local dev (no connection string → no cache/check).
+  `compose.debug.yaml` is the debug variant.
+- Container-level probe: the api's `Dockerfile` installs `curl` (root, in the `final`
+  stage) and declares a `HEALTHCHECK` hitting `http://localhost:5000/health`
+  (interval 10s / timeout 5s / retries 5 / start_period 30s, non-root via `$APP_UID`).
+  Both compose variants build from that Dockerfile, so they inherit the probe —
+  keep it wired when touching `/health`.
 
 ## Tests & verification workflow
 

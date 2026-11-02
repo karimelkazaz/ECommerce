@@ -158,6 +158,7 @@ Design details:
 |---|---|
 | Runtime | .NET 10 |
 | Web | ASP.NET Core Minimal APIs, OpenAPI |
+| Health checks | ASP.NET Core Health Checks + UI (SQL Server via EF Core, Redis) |
 | Data | Entity Framework Core 10, SQL Server |
 | Identity & auth | ASP.NET Core Identity, JWT Bearer, hash-based refresh tokens |
 | Email | MailKit / SMTP (console-fallback in development) |
@@ -194,6 +195,12 @@ The API is available at `https://localhost:<port>` with OpenAPI documents expose
 ## API Endpoints
 
 Base route: `/api/v{version}` (currently `v1`, e.g. `/api/v1/products`)
+
+### Health
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/health` | Health report in [HealthChecks.UI](https://github.com/Xabaril/AspNetCore.Diagnostics.HealthChecks) JSON format — checks both SQL Server contexts and Redis (when `ConnectionStrings:Redis` is configured) |
 
 ### Catalog & management
 

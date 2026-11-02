@@ -5,8 +5,11 @@ using ECommerce.Api.Endpoints;
 using ECommerce.Api.ExceptionHandlers;
 using ECommerce.Application;
 using ECommerce.Infrastructure;
+using ECommerce.Infrastructure.Persistence.DbContexts;
 using ECommerce.Infrastructure.Persistence.Seeding;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
+using HealthChecks.UI.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +17,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+var healthChecksBuilder = builder.Services.AddHealthChecks();
+
+healthChecksBuilder
+    .AddDbContextCheck<ApplicationDbContext>()
+    .AddDbContextCheck<AppIdentityDbContext>();
+
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    healthChecksBuilder.AddRedis(redisConnectionString);
+}
 
 builder.Services
     .AddApiVersioning(options =>
@@ -94,6 +109,11 @@ catch (Exception ex)
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
