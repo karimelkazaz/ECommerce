@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Asp.Versioning.Builder;
 using ECommerce.Api.Endpoints;
 using ECommerce.Api.ExceptionHandlers;
+using ECommerce.Api.Common;
 using ECommerce.Application;
 using ECommerce.Infrastructure;
 using ECommerce.Infrastructure.Persistence.DbContexts;
@@ -124,7 +125,8 @@ var apiVersionSet = app.NewApiVersionSet()
     .Build();
 
 var versionedApi = app.MapGroup("api/v{version:apiVersion}")
-    .WithApiVersionSet(apiVersionSet);
+    .WithApiVersionSet(apiVersionSet)
+    .AddEndpointFilter<LogRequestFilter>();
 
 versionedApi.MapAuthEndpoints();
 versionedApi.MapProductEndpoints();
