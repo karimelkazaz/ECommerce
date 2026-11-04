@@ -37,7 +37,7 @@ internal static class StockRelease
                 continue;
             }
 
-            var releaseResult = inventoryItem.Release(orderId.Value);
+            var releaseResult = inventoryItem.Release(orderId);
             if (releaseResult.IsFailure)
             {
                 logger.LogWarning(

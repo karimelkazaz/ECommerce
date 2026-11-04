@@ -1,4 +1,5 @@
 using ECommerce.Domain.Entities.Inventory;
+using ECommerce.Domain.Entities.Orders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,6 +18,9 @@ public sealed class StockLedgerEntryConfiguration : IEntityTypeConfiguration<Sto
             .ValueGeneratedNever();
 
         builder.Property(e => e.OrderId)
+            .HasConversion(
+                id => id.Value,
+                value => new OrderId(value))
             .IsRequired();
 
         builder.Property(e => e.Type);

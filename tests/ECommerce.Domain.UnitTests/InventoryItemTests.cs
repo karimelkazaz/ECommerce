@@ -1,5 +1,6 @@
 using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Inventory.Events;
+using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using Xunit;
 
@@ -111,7 +112,7 @@ public class InventoryItemTests
     {
         var inventoryItem = Create(10);
         inventoryItem.ClearDomainEvents();
-        var orderId = Guid.NewGuid();
+        var orderId = OrderId.New();
 
         var result = inventoryItem.Reserve(orderId, 3);
 
@@ -130,7 +131,7 @@ public class InventoryItemTests
     {
         var inventoryItem = Create(2);
 
-        var result = inventoryItem.Reserve(Guid.NewGuid(), 3);
+        var result = inventoryItem.Reserve(OrderId.New(), 3);
 
         Assert.True(result.IsFailure);
         Assert.Equal(InventoryErrors.InsufficientStock.Code, result.Error.Code);
@@ -145,10 +146,10 @@ public class InventoryItemTests
 
         Assert.Equal(
             InventoryErrors.InvalidQuantity.Code,
-            inventoryItem.Reserve(Guid.NewGuid(), 0).Error.Code);
+            inventoryItem.Reserve(OrderId.New(), 0).Error.Code);
         Assert.Equal(
             InventoryErrors.InvalidQuantity.Code,
-            inventoryItem.Reserve(Guid.NewGuid(), -1).Error.Code);
+            inventoryItem.Reserve(OrderId.New(), -1).Error.Code);
 
         Assert.Equal(2, inventoryItem.AvailableQuantity);
         Assert.Empty(inventoryItem.Ledger);
@@ -158,7 +159,7 @@ public class InventoryItemTests
     public void Release_RestoresOutstandingReservationAndWritesReleaseEntry()
     {
         var inventoryItem = Create(10);
-        var orderId = Guid.NewGuid();
+        var orderId = OrderId.New();
         Assert.True(inventoryItem.Reserve(orderId, 4).IsSuccess);
         inventoryItem.ClearDomainEvents();
 
@@ -177,7 +178,7 @@ public class InventoryItemTests
     public void Release_WhenReplayed_IsIdempotent()
     {
         var inventoryItem = Create(10);
-        var orderId = Guid.NewGuid();
+        var orderId = OrderId.New();
         Assert.True(inventoryItem.Reserve(orderId, 4).IsSuccess);
 
         Assert.True(inventoryItem.Release(orderId).IsSuccess);
@@ -195,7 +196,7 @@ public class InventoryItemTests
     {
         var inventoryItem = Create(10);
 
-        var result = inventoryItem.Release(Guid.NewGuid());
+        var result = inventoryItem.Release(OrderId.New());
 
         Assert.True(result.IsSuccess);
         Assert.Equal(10, inventoryItem.AvailableQuantity);
@@ -206,8 +207,8 @@ public class InventoryItemTests
     public void Release_OnlyReleasesOutstandingEntriesForThatOrder()
     {
         var inventoryItem = Create(10);
-        var firstOrder = Guid.NewGuid();
-        var secondOrder = Guid.NewGuid();
+        var firstOrder = OrderId.New();
+        var secondOrder = OrderId.New();
         Assert.True(inventoryItem.Reserve(firstOrder, 4).IsSuccess);
         Assert.True(inventoryItem.Reserve(secondOrder, 2).IsSuccess);
 

@@ -59,7 +59,7 @@ internal sealed class StockReservationService(
                     return;
                 }
 
-                var reserveResult = inventoryItem.Reserve(orderId.Value, quantity);
+                var reserveResult = inventoryItem.Reserve(orderId, quantity);
                 if (reserveResult.IsFailure)
                 {
                     logger.LogInformation(

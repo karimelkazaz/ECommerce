@@ -1,5 +1,6 @@
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Inventory.Events;
+using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 
 namespace ECommerce.Domain.Entities.Inventory;
@@ -51,7 +52,7 @@ public sealed class InventoryItem : Entity<InventoryItemId>
         return Result.Success();
     }
 
-    public Result Reserve(Guid orderId, int quantity)
+    public Result Reserve(OrderId orderId, int quantity)
     {
         if (quantity < 1)
             return Result.Failure(InventoryErrors.InvalidQuantity);
@@ -66,7 +67,7 @@ public sealed class InventoryItem : Entity<InventoryItemId>
         return Result.Success();
     }
 
-    public Result Release(Guid orderId)
+    public Result Release(OrderId orderId)
     {
         // Idempotent: releases replayed past the ledger resolve to success without
         // touching stock, so a cancelled order can never be restocked twice.
