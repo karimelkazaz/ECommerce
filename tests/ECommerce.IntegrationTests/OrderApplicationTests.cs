@@ -7,6 +7,7 @@ using ECommerce.Application.Orders.Queries;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.Baskets;
 using ECommerce.Domain.Entities.DeliveryMethods;
+using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Orders.Events;
 using ECommerce.Domain.Entities.Products;
@@ -28,6 +29,7 @@ public class OrderApplicationTests
     private readonly FakeOrderRepository _orderRepository = new();
     private readonly FakeDeliveryMethodRepository _deliveryMethodRepository = new();
     private readonly FakeProductRepository _productRepository = new();
+    private readonly FakeStockReservationService _stockReservation = new();
     private readonly FakeBasketStore _basketStore = new();
     private readonly FakeDbContext _db = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
@@ -64,6 +66,23 @@ public class OrderApplicationTests
 
         var basket = await _basketStore.GetAsync(context.UserId);
         Assert.Empty(basket!.Items);
+    }
+
+    [Fact]
+    public async Task CheckoutCommandHandler_WhenStockReservationFails_FailsAndAddsNoOrder()
+    {
+        var context = await BuildCheckoutAsync();
+        _stockReservation.FailureError = Error.Problem(
+            Domain.Entities.Inventory.InventoryErrors.InsufficientStock.Code,
+            "Not enough left");
+
+        var result = await context.Handler.Handle(
+            new CheckoutCommand(context.DeliveryMethod.Id.Value, context.UserAddress.Id.Value),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(Domain.Entities.Inventory.InventoryErrors.InsufficientStock.Code, result.Error.Code);
+        Assert.Equal(1, _stockReservation.Calls);
     }
 
     [Fact]
@@ -528,8 +547,7 @@ public class OrderApplicationTests
         bool seedBasketItem = true,
         decimal productPrice = 20m,
         Guid? addressOwnerId = null)
-    {
-        var userId = _currentUser.UserId!.Value;
+    {        var userId = _currentUser.UserId!.Value;
 
         var product = Product(productPrice);
         _productRepository.Add(product);
@@ -556,6 +574,7 @@ public class OrderApplicationTests
             _orderRepository,
             _deliveryMethodRepository,
             _productRepository,
+            _stockReservation,
             _db,
             _basketStore,
             _currentUser,
@@ -635,6 +654,7 @@ public class OrderApplicationTests
         public IQueryable<UserAddress> UserAddresses => UserAddressesList.AsQueryable().AsTestAsyncQueryable();
         public IQueryable<Order> Orders => OrdersList.AsQueryable().AsTestAsyncQueryable();
         public IQueryable<Product> Products => Array.Empty<Product>().AsQueryable().AsTestAsyncQueryable();
+        public IQueryable<InventoryItem> InventoryItems => Array.Empty<InventoryItem>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<ProductBrand> Brands => Array.Empty<ProductBrand>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<ProductType> Types => Array.Empty<ProductType>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<DeliveryMethod> DeliveryMethods => Array.Empty<DeliveryMethod>().AsQueryable().AsTestAsyncQueryable();
@@ -749,6 +769,26 @@ public class OrderApplicationTests
             _baskets.Remove(userId);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeStockReservationService : IStockReservationService
+    {
+        public Error? FailureError { get; set; }
+        public int Calls { get; private set; }
+
+        public Task<Result> ReserveForOrderAsync(
+            OrderId orderId,
+            IReadOnlyList<StockReservationLine> lines,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastLines = lines.ToList();
+            return Task.FromResult(FailureError is null
+                ? Result.Success()
+                : Result.Failure(FailureError));
+        }
+
+        public IReadOnlyList<StockReservationLine>? LastLines { get; private set; }
     }
 
     private sealed class FakePaymentService : IPaymentService

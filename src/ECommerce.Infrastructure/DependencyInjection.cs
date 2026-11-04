@@ -3,6 +3,7 @@ using ECommerce.Application.Common.Interfaces;
 using ECommerce.Application.Common.Options;
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.DeliveryMethods;
+using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
@@ -13,6 +14,7 @@ using ECommerce.Infrastructure.Caching;
 using ECommerce.Infrastructure.Email;
 using ECommerce.Infrastructure.Persistence.DbContexts;
 using ECommerce.Infrastructure.Persistence.Identity;
+using ECommerce.Infrastructure.Persistence.Inventory;
 using ECommerce.Infrastructure.Persistence.Inbox;
 using ECommerce.Infrastructure.Persistence.Interceptors;
 using ECommerce.Infrastructure.Persistence.Otp;
@@ -179,8 +181,10 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
             services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
             services.AddScoped<IProductTypeRepository, ProductTypeRepository>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
             services.AddScoped<IDeliveryMethodRepository, DeliveryMethodRepository>();
             services.AddScoped<IUserAddressRepository, UserAddressRepository>();
+            services.AddScoped<IStockReservationService, StockReservationService>();
 
             services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
             services.AddScoped<IPaymentService, StripePaymentService>();

@@ -130,6 +130,7 @@ var versionedApi = app.MapGroup("api/v{version:apiVersion}")
 
 versionedApi.MapAuthEndpoints();
 versionedApi.MapProductEndpoints();
+versionedApi.MapInventoryEndpoints();
 versionedApi.MapBrandEndpoints();
 versionedApi.MapProductTypeEndpoints();
 versionedApi.MapDeliveryMethodEndpoints();

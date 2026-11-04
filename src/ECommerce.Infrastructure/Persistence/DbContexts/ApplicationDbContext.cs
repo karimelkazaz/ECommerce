@@ -1,5 +1,6 @@
 using ECommerce.Application.Common.Interfaces;
 using ECommerce.Domain.Entities.DeliveryMethods;
+using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
@@ -20,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ProductType> TypesSet => Set<ProductType>();
     public DbSet<DeliveryMethod> DeliveryMethodsSet => Set<DeliveryMethod>();
     public DbSet<Order> OrdersSet => Set<Order>();
+    public DbSet<InventoryItem> InventoryItemsSet => Set<InventoryItem>();
     public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
@@ -29,6 +31,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     IQueryable<ProductType> IApplicationDbContext.Types => TypesSet.AsNoTracking();
     IQueryable<DeliveryMethod> IApplicationDbContext.DeliveryMethods => DeliveryMethodsSet.AsNoTracking();
     IQueryable<Order> IApplicationDbContext.Orders => OrdersSet.AsNoTracking();
+    IQueryable<InventoryItem> IApplicationDbContext.InventoryItems => InventoryItemsSet.AsNoTracking();
     IQueryable<UserAddress> IApplicationDbContext.UserAddresses => UserAddresses.AsNoTracking();
 
     public async Task ExecuteInTransactionAsync(

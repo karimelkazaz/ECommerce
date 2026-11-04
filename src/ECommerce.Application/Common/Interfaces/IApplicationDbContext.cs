@@ -1,5 +1,6 @@
 using ECommerce.Domain.Common;
 using ECommerce.Domain.Entities.DeliveryMethods;
+using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Orders;
 using ECommerce.Domain.Entities.Products;
 using ECommerce.Domain.Entities.ProductsBrand;
@@ -15,5 +16,6 @@ public interface IApplicationDbContext : IUnitOfWork
     IQueryable<ProductType> Types { get; }
     IQueryable<DeliveryMethod> DeliveryMethods { get; }
     IQueryable<Order> Orders { get; }
+    IQueryable<InventoryItem> InventoryItems { get; }
     IQueryable<UserAddress> UserAddresses { get; }
 }

@@ -232,6 +232,9 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 | PATCH | `/api/v1/delivery-methods/{id}/description` | Change or clear delivery description |
 | PATCH | `/api/v1/delivery-methods/{id}/availability` | Toggle availability (checkout rejects unavailable methods) |
 | DELETE | `/api/v1/delivery-methods/{id}` | Soft-delete delivery method |
+| GET | `/api/v1/inventory/{productId}` | Get stock availability for a product |
+| POST | `/api/v1/inventory` | Create an inventory record for a product |
+| PATCH | `/api/v1/inventory/{productId}/adjust` | Adjust stock by a signed delta |
 
 ### Orders (authenticated)
 
@@ -248,6 +251,10 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 
 Checkout re-validates cached basket prices against live products (fails on `ProductPriceChanged`/`ProductNotFound`),
 consumes the basket, and returns the payment intent `clientSecret` for the client-side Stripe.js confirmation.
+Checkout also reserves stock: each basket line is deducted from the product's `InventoryItem` inside a lock-protected
+transaction that commits together with the order — a product without an inventory record or with insufficient stock
+fails checkout (`409 Inventory.ProductNotTracked` / `409 Inventory.InsufficientStock`). Order cancellation and refund
+release the reserved stock back (idempotent via the stock ledger).
 Webhook handling is idempotent: late/duplicate events cannot overwrite a later lifecycle state.
 
 ### Auth (anonymous except where noted)

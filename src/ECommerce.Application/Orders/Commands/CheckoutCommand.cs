@@ -22,6 +22,7 @@ public sealed class CheckoutCommandHandler(
     IOrderRepository orders,
     IDeliveryMethodRepository deliveryMethods,
     IProductRepository products,
+    IStockReservationService stockReservation,
     IApplicationDbContext db,
     IBasketStore basketStore,
     ICurrentUserService currentUser,
@@ -108,6 +109,10 @@ public sealed class CheckoutCommandHandler(
                 await paymentService.CancelPaymentIntentAsync(pendingOrder.PaymentIntentId, cancellationToken);
         }
 
+        // Persist the supersessions alone: the new order is not added yet, so it
+        // cannot leak out if stock reservation fails below.
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
         // 6. Create the order (domain validates item/fee currency consistency).
         var basketItems = basket.Items
             .Select(i => new BasketItemDto(i.ProductId, i.ProductName, i.PictureUrl, i.Price, i.Quantity))
@@ -125,7 +130,19 @@ public sealed class CheckoutCommandHandler(
 
         var order = orderResult.Value;
         orders.Add(order);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // 6b. Reserve stock inside a lock-protected transaction that commits the
+        // order and its stock reservation atomically. Failure keeps the pending
+        // supersessions from step 5 but never persists the new order.
+        var reserveResult = await stockReservation.ReserveForOrderAsync(
+            order.Id,
+            basket.Items
+                .Select(i => new StockReservationLine(i.ProductId, i.ProductName, i.Quantity))
+                .ToList(),
+            cancellationToken);
+
+        if (reserveResult.IsFailure)
+            return Result.Failure<CheckoutResponse>(reserveResult.Error);
 
         // 7. Create the payment intent (after the order is persisted; idempotency key is the order id).
         var intentResult = await paymentService.CreatePaymentIntentAsync(order, cancellationToken);
