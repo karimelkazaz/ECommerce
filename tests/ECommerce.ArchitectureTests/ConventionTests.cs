@@ -20,6 +20,8 @@ public class ConventionTests
             .HaveNameEndingWith("QueryHandler")
             .Or()
             .HaveNameEndingWith("DomainEventHandler")
+            .Or()
+            .HaveNameEndingWith("NotificationHandler")
             .Should()
             .BeSealed()
             .GetResult();

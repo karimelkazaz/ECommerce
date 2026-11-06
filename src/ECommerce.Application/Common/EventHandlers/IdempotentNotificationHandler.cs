@@ -2,6 +2,7 @@ using ECommerce.Application.Common.Interfaces;
 using ECommerce.Domain.Common;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace ECommerce.Application.Common.EventHandlers;
 
@@ -11,6 +12,25 @@ namespace ECommerce.Application.Common.EventHandlers;
 /// together. External side effects must not be performed inline; enqueue a
 /// follow-up outbox message through <see cref="IOutboxWriter"/> instead.
 /// </summary>
+/// <remarks>
+/// <see cref="HandleCore"/> rides a transaction owned by this base class
+/// (inbox claim + changes commit atomically). Implement it in terms of plain
+/// repository/DbContext work on the ambient unit of work:
+/// <list type="bullet">
+/// <item>Never open a transaction inside <see cref="HandleCore"/> — a nested
+/// <c>IUnitOfWork.ExecuteInTransactionAsync</c> (e.g. calling a service like
+/// <c>ReserveForOrderAsync</c> that wraps its work in one) throws by design.</item>
+/// <item>Never perform external side effects (SMTP, payment gateways,
+/// third-party APIs) inline. The transaction can still roll back *after* such a
+/// call succeeds, and the outbox retry then re-executes it — the effect would
+/// fire twice without any guard. Defer it: enqueue a follow-up message with
+/// <see cref="IOutboxWriter"/>; it is persisted with this transaction and only
+/// delivered once the claim and changes have committed.</item>
+/// <item>Redelivery may occur after a crash before the commit, so
+/// <see cref="HandleCore"/> must tolerate replaying past already-committed
+/// state (idempotent by construction).</item>
+/// </list>
+/// </remarks>
 public abstract class IdempotentNotificationHandler<TNotification>(
     IInbox inbox,
     IUnitOfWork unitOfWork,
@@ -50,10 +70,19 @@ public abstract class IdempotentNotificationHandler<TNotification>(
                     return;
                 }
 
+                var startedAt = Stopwatch.GetTimestamp();
+
                 try
                 {
                     await HandleCore(notification, ct);
                     await unitOfWork.SaveChangesAsync(ct);
+
+                    logger.LogInformation(
+                        "Consumer {Consumer} handled {EventType} ({MessageId}) in {ElapsedMilliseconds} ms.",
+                        ConsumerId,
+                        messageContext.EventType,
+                        messageContext.MessageId,
+                        Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
                 }
                 catch (Exception ex)
                 {

@@ -27,6 +27,12 @@ public sealed class InventoryItemConfiguration : IEntityTypeConfiguration<Invent
         builder.Property(i => i.AvailableQuantity)
             .IsRequired();
 
+        // Optimistic concurrency: rowversion column, tracked as a concurrency
+        // token. A concurrent stock mutation fails at save time rather than
+        // silently last-write-wins-ing over another worker's change.
+        builder.Property(i => i.RowVersion)
+            .IsRowVersion();
+
         // One inventory record per product. Soft-deleted products keep their
         // row (NoAction), mirroring how Products reference brands and types.
         builder.HasIndex(i => i.ProductId)

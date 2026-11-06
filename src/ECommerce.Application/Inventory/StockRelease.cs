@@ -19,16 +19,29 @@ internal static class StockRelease
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var productIds = await db.Orders
+        var productIds = (await db.Orders
             .Where(o => o.Id == orderId)
             .SelectMany(o => o.OrderItems)
             .Select(i => i.ProductId)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken))
+            .Distinct()
+            .ToList();
 
-        foreach (var productId in productIds.Distinct())
+        if (productIds.Count == 0)
         {
-            var inventoryItem = await inventory.GetByProductIdAsync(productId, cancellationToken);
-            if (inventoryItem is null)
+            return;
+        }
+
+        // One query for every inventory row involved in the order; replayed
+        // releases no longer issue one per-product roundtrip.
+        var inventoryItems = await inventory.GetByProductIdsAsync(productIds, cancellationToken);
+
+        // Products without an inventory row (created before inventory existed)
+        // surface in the warning loop below.
+        var tracked = inventoryItems.ToDictionary(i => i.ProductId);
+        foreach (var productId in productIds)
+        {
+            if (!tracked.TryGetValue(productId, out var inventoryItem))
             {
                 logger.LogWarning(
                     "No inventory record for product {ProductId}; skipping stock release for order {OrderId}.",

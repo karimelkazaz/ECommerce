@@ -31,6 +31,12 @@ public class InventoryApplicationTests
         Assert.Equal(product.Id.Value, result.Value.ProductId);
         Assert.Equal(15, result.Value.AvailableQuantity);
         Assert.Single(_inventory.Items);
+
+        var created = _inventory.Items.Single();
+        var initialEntry = Assert.Single(created.Ledger);
+        Assert.Equal(StockLedgerEntryType.Initial, initialEntry.Type);
+        Assert.Equal(15, initialEntry.Quantity);
+        Assert.Null(initialEntry.OrderId);
     }
 
     [Fact]
@@ -47,6 +53,7 @@ public class InventoryApplicationTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value.AvailableQuantity);
+        Assert.Empty(_inventory.Items.Single().Ledger);
     }
 
     [Fact]
@@ -94,6 +101,12 @@ public class InventoryApplicationTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(17, inventoryItem.AvailableQuantity);
+
+        var adjustment = Assert.Single(inventoryItem.Ledger, e => e.Type == StockLedgerEntryType.Adjustment);
+        Assert.Equal(StockLedgerEntryType.Adjustment, adjustment.Type);
+        Assert.Equal(7, adjustment.Quantity);
+        Assert.Null(adjustment.OrderId);
+        Assert.Equal(inventoryItem.AvailableQuantity, inventoryItem.ReconstructedAvailability());
     }
 
     [Fact]
@@ -110,6 +123,11 @@ public class InventoryApplicationTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(6, inventoryItem.AvailableQuantity);
+
+        var adjustment = Assert.Single(inventoryItem.Ledger, e => e.Type == StockLedgerEntryType.Adjustment);
+        Assert.Equal(StockLedgerEntryType.Adjustment, adjustment.Type);
+        Assert.Equal(-4, adjustment.Quantity);
+        Assert.Null(adjustment.OrderId);
     }
 
     [Fact]
@@ -202,6 +220,9 @@ public class InventoryApplicationTests
             _items.TryGetValue(productId, out var inventoryItem);
             return Task.FromResult(inventoryItem);
         }
+
+        public Task<List<InventoryItem>> GetByProductIdsAsync(IReadOnlyCollection<ProductId> productIds, CancellationToken ct = default)
+            => Task.FromResult(_items.Values.Where(i => productIds.Contains(i.ProductId)).ToList());
 
         public void Add(InventoryItem inventoryItem) => _items[inventoryItem.ProductId] = inventoryItem;
     }

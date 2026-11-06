@@ -5,6 +5,7 @@ using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Products;
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Application.Inventory.Commands;
 
@@ -26,7 +27,16 @@ public sealed class AdjustInventoryItemCommandHandler(
         if (adjustResult.IsFailure)
             return adjustResult;
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            // The rowversion guard turns a concurrent stock mutation into a
+            // client-retryable conflict instead of a silent lost update.
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(InventoryErrors.ConcurrencyConflict);
+        }
 
         return Result.Success();
     }

@@ -17,17 +17,22 @@ public sealed class StockLedgerEntryConfiguration : IEntityTypeConfiguration<Sto
         builder.Property(e => e.Id)
             .ValueGeneratedNever();
 
+        // Null for Initial/Adjustment entries; order-bound only for Reserve/Release.
         builder.Property(e => e.OrderId)
             .HasConversion(
-                id => id.Value,
-                value => new OrderId(value))
-            .IsRequired();
+                id => id.HasValue ? id.Value.Value : (Guid?)null,
+                value => value.HasValue ? new OrderId(value.Value) : (OrderId?)null);
 
-        builder.Property(e => e.Type);
+        // Stored as its enum name ('Reserve', 'Release', ...) so raw SQL queries
+        // and database logs are human-readable without joining enum definitions.
+        builder.Property(e => e.Type)
+            .HasConversion<string>()
+            .IsRequired()
+            .HasMaxLength(32);
 
         builder.Property(e => e.Quantity)
             .IsRequired();
 
-        builder.HasIndex(e => e.OrderId);
+        builder.HasIndex(e => new { e.OrderId, e.Type });
     }
 }

@@ -12,6 +12,12 @@ public sealed class InventoryItemRepository(ApplicationDbContext dbContext) : II
             .Include(i => i.Ledger)
             .FirstOrDefaultAsync(i => i.ProductId == productId, ct);
 
+    public Task<List<InventoryItem>> GetByProductIdsAsync(IReadOnlyCollection<ProductId> productIds, CancellationToken ct = default)
+        => dbContext.InventoryItemsSet
+            .Include(i => i.Ledger)
+            .Where(i => productIds.Contains(i.ProductId))
+            .ToListAsync(ct);
+
     public void Add(InventoryItem inventoryItem)
         => dbContext.InventoryItemsSet.Add(inventoryItem);
 }

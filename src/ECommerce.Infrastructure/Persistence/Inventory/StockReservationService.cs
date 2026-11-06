@@ -4,6 +4,7 @@ using ECommerce.Domain.Entities.Inventory;
 using ECommerce.Domain.Entities.Orders;
 using ECommerce.Infrastructure.Persistence.DbContexts;
 using ECommerce.Infrastructure.Persistence.Locking;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerce.Infrastructure.Persistence.Inventory;
@@ -29,54 +30,67 @@ internal sealed class StockReservationService(
         Error? failure = null;
         var lockAcquired = false;
 
-        await db.ExecuteInTransactionAsync(async ct =>
+        try
         {
-            if (!await SqlApplicationLock.TryAcquireAsync(db, LockResource, ct))
+            await db.ExecuteInTransactionAsync(async ct =>
             {
-                logger.LogWarning(
-                    "Stock reservation lock could not be acquired for order {OrderId}.",
-                    orderId.Value);
-                failure = InventoryErrors.LockUnavailable;
-                return;
-            }
-
-            lockAcquired = true;
-
-            foreach (var group in lines.GroupBy(l => l.ProductId))
-            {
-                var quantity = group.Sum(l => l.Quantity);
-
-                var inventoryItem = await inventory.GetByProductIdAsync(group.Key, ct);
-                if (inventoryItem is null)
+                if (!await SqlApplicationLock.TryAcquireAsync(db, LockResource, ct))
                 {
                     logger.LogWarning(
-                        "No inventory record for product {ProductId}; refusing checkout for order {OrderId}.",
-                        group.Key.Value,
+                        "Stock reservation lock could not be acquired for order {OrderId}.",
                         orderId.Value);
-                    failure = Error.Conflict(
-                        "Inventory.ProductNotTracked",
-                        $"Product '{group.First().ProductName}' has no inventory record and cannot be purchased.");
+                    failure = InventoryErrors.LockUnavailable;
                     return;
                 }
 
-                var reserveResult = inventoryItem.Reserve(orderId, quantity);
-                if (reserveResult.IsFailure)
+                lockAcquired = true;
+
+                foreach (var group in lines.GroupBy(l => l.ProductId))
                 {
-                    logger.LogInformation(
-                        "Insufficient stock for product {ProductId} on order {OrderId}.",
-                        group.Key.Value,
-                        orderId.Value);
-                    failure = Error.Conflict(
-                        "Inventory.InsufficientStock",
-                        $"Only {inventoryItem.AvailableQuantity} left of '{group.First().ProductName}'. Please reduce the quantity.");
-                    return;
-                }
-            }
+                    var quantity = group.Sum(l => l.Quantity);
 
-            // Persists the reservations together with everything already tracked
-            // on the ambient context — the checkout order and its outbox events.
-            await unitOfWork.SaveChangesAsync(ct);
-        }, cancellationToken);
+                    var inventoryItem = await inventory.GetByProductIdAsync(group.Key, ct);
+                    if (inventoryItem is null)
+                    {
+                        logger.LogWarning(
+                            "No inventory record for product {ProductId}; refusing checkout for order {OrderId}.",
+                            group.Key.Value,
+                            orderId.Value);
+                        failure = Error.Conflict(
+                            "Inventory.ProductNotTracked",
+                            $"Product '{group.First().ProductName}' has no inventory record and cannot be purchased.");
+                        return;
+                    }
+
+                    var reserveResult = inventoryItem.Reserve(orderId, quantity);
+                    if (reserveResult.IsFailure)
+                    {
+                        logger.LogInformation(
+                            "Insufficient stock for product {ProductId} on order {OrderId}.",
+                            group.Key.Value,
+                            orderId.Value);
+                        failure = Error.Conflict(
+                            "Inventory.InsufficientStock",
+                            $"Only {inventoryItem.AvailableQuantity} left of '{group.First().ProductName}'. Please reduce the quantity.");
+                        return;
+                    }
+                }
+
+                // Persists the reservations together with everything already tracked
+                // on the ambient context — the checkout order and its outbox events.
+                // On a rowversion conflict this throws, so ExecuteInTransactionAsync
+                // rolls back the whole transaction (order + reservation together).
+                await unitOfWork.SaveChangesAsync(ct);
+            }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Stock changed concurrently for order {OrderId}; reserving must be retried.",
+                orderId.Value);
+            failure = InventoryErrors.ConcurrencyConflict;
+        }
 
         if (lockAcquired)
         {

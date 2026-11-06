@@ -11,5 +11,6 @@ namespace ECommerce.Domain.Entities.Inventory
         public static readonly Error Duplicate = Error.Conflict("Inventory.Duplicate", "An inventory record already exists for this product.");
         public static readonly Error ProductNotTracked = Error.Conflict("Inventory.ProductNotTracked", "Product has no inventory record and cannot be purchased.");
         public static readonly Error LockUnavailable = Error.Failure("Inventory.LockUnavailable", "Stock reservation timed out. Please try again.");
+        public static readonly Error ConcurrencyConflict = Error.Conflict("Inventory.ConcurrencyConflict", "Stock changed while processing. Please retry.");
     }
 }
