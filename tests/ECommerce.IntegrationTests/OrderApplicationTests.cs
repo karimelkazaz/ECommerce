@@ -655,6 +655,7 @@ public class OrderApplicationTests
         public IQueryable<Order> Orders => OrdersList.AsQueryable().AsTestAsyncQueryable();
         public IQueryable<Product> Products => Array.Empty<Product>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<InventoryItem> InventoryItems => Array.Empty<InventoryItem>().AsQueryable().AsTestAsyncQueryable();
+        public IQueryable<SalesSummary> SalesSummaries => Array.Empty<SalesSummary>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<ProductBrand> Brands => Array.Empty<ProductBrand>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<ProductType> Types => Array.Empty<ProductType>().AsQueryable().AsTestAsyncQueryable();
         public IQueryable<DeliveryMethod> DeliveryMethods => Array.Empty<DeliveryMethod>().AsQueryable().AsTestAsyncQueryable();

@@ -16,6 +16,7 @@ public interface IApplicationDbContext : IUnitOfWork
     IQueryable<ProductType> Types { get; }
     IQueryable<DeliveryMethod> DeliveryMethods { get; }
     IQueryable<Order> Orders { get; }
+    IQueryable<SalesSummary> SalesSummaries { get; }
     IQueryable<InventoryItem> InventoryItems { get; }
     IQueryable<UserAddress> UserAddresses { get; }
 }

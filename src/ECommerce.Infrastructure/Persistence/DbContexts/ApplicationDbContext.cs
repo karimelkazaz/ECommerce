@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ProductType> TypesSet => Set<ProductType>();
     public DbSet<DeliveryMethod> DeliveryMethodsSet => Set<DeliveryMethod>();
     public DbSet<Order> OrdersSet => Set<Order>();
+    public DbSet<SalesSummary> SalesSummariesSet => Set<SalesSummary>();
     public DbSet<InventoryItem> InventoryItemsSet => Set<InventoryItem>();
     public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -31,6 +32,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     IQueryable<ProductType> IApplicationDbContext.Types => TypesSet.AsNoTracking();
     IQueryable<DeliveryMethod> IApplicationDbContext.DeliveryMethods => DeliveryMethodsSet.AsNoTracking();
     IQueryable<Order> IApplicationDbContext.Orders => OrdersSet.AsNoTracking();
+    IQueryable<SalesSummary> IApplicationDbContext.SalesSummaries => SalesSummariesSet.AsNoTracking();
     IQueryable<InventoryItem> IApplicationDbContext.InventoryItems => InventoryItemsSet.AsNoTracking();
     IQueryable<UserAddress> IApplicationDbContext.UserAddresses => UserAddresses.AsNoTracking();
 

@@ -12,6 +12,7 @@ public sealed class StockReservedDomainEventHandler(
     IUnitOfWork unitOfWork,
     IOutboxMessageContext messageContext,
     IInventoryItemRepository inventory,
+    IStockAttentionPolicy policy,
     IOutboxWriter outboxWriter,
     ILogger<StockReservedDomainEventHandler> logger)
     : IdempotentNotificationHandler<StockReservedDomainEvent>(inbox, unitOfWork, messageContext, logger)
@@ -29,11 +30,12 @@ public sealed class StockReservedDomainEventHandler(
             notification.ProductId.Value,
             notification.AvailableQuantity);
 
-        await StockDepletionFollowUp.EnqueueIfDepletedAsync(
+        await StockAttentionFollowUps.EnqueueStockAttentionAsync(
             notification.InventoryItemId,
             notification.ProductId,
             notification.AvailableQuantity,
             inventory,
+            policy,
             outboxWriter,
             logger,
             cancellationToken);

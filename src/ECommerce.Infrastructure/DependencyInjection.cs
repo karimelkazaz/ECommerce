@@ -51,6 +51,14 @@ namespace ECommerce.Infrastructure
             services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
             services.Configure<OtpOptions>(configuration.GetSection(OtpOptions.SectionName));
 
+            services
+                .AddOptions<StockAlertsOptions>()
+                .Bind(configuration.GetSection(StockAlertsOptions.SectionName))
+                .Validate(
+                    options => !options.LowStockAlertsEnabled || options.LowStockThreshold is >= 1,
+                    "StockAlerts:LowStockThreshold must be at least 1 when LowStockAlertsEnabled is true.")
+                .ValidateOnStart();
+
             services.AddOptions<InboxOptions>()
                 .Bind(configuration.GetSection(InboxOptions.SectionName))
                 .Validate(
@@ -184,6 +192,8 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
             services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
             services.AddScoped<IDeliveryMethodRepository, DeliveryMethodRepository>();
             services.AddScoped<IUserAddressRepository, UserAddressRepository>();
+            services.AddScoped<ISalesSummaryRepository, SalesSummaryRepository>();
+            services.AddSingleton<IStockAttentionPolicy, StockAttentionPolicy>();
             services.AddScoped<IStockReservationService, StockReservationService>();
 
             services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
