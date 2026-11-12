@@ -314,7 +314,15 @@ public sealed class InboxHardeningTests
         var migrator = dbContext.Database.GetService<IMigrator>();
 
         var migrations = dbContext.Database.GetMigrations().ToList();
-        var previousMigration = migrations[^2];
+
+        // Migrate to the state just before the composite-key migration, which
+        // performs the legacy-row backfill. Anchor on its name instead of
+        // list position: appending unrelated migrations at the end must not
+        // change what this test exercises.
+        var hardeningIndex = migrations.FindIndex(
+            migration => migration.EndsWith("AddPerConsumerInboxClaims", StringComparison.Ordinal));
+        Assert.True(hardeningIndex > 0, "AddPerConsumerInboxClaims migration not found.");
+        var previousMigration = migrations[hardeningIndex - 1];
 
         await migrator.MigrateAsync(previousMigration);
 

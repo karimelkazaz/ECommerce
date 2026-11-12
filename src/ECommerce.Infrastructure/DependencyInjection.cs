@@ -18,6 +18,7 @@ using ECommerce.Infrastructure.Persistence.Inventory;
 using ECommerce.Infrastructure.Persistence.Inbox;
 using ECommerce.Infrastructure.Persistence.Interceptors;
 using ECommerce.Infrastructure.Persistence.Otp;
+using ECommerce.Infrastructure.Persistence.OrderExpiry;
 using ECommerce.Infrastructure.Persistence.Outbox;
 using ECommerce.Infrastructure.Persistence.Repositories;
 using ECommerce.Infrastructure.Payment;
@@ -67,6 +68,16 @@ namespace ECommerce.Infrastructure
                 .Validate(
                     options => options.CleanupIntervalMinutes > 0,
                     "Inbox:CleanupIntervalMinutes must be greater than zero.")
+                .ValidateOnStart();
+
+            services.AddOptions<OrderExpiryOptions>()
+                .Bind(configuration.GetSection(OrderExpiryOptions.SectionName))
+                .Validate(
+                    options => options.PendingExpirationHours > 0,
+                    "OrderExpiry:PendingExpirationHours must be greater than zero.")
+                .Validate(
+                    options => options.ScanIntervalMinutes > 0,
+                    "OrderExpiry:ScanIntervalMinutes must be greater than zero.")
                 .ValidateOnStart();
 
             services
@@ -208,6 +219,8 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
             services.AddHostedService<OutboxProcessor>();
             services.AddSingleton<InboxCleanupService>();
             services.AddHostedService(sp => sp.GetRequiredService<InboxCleanupService>());
+            services.AddSingleton<OrderExpiryService>();
+            services.AddHostedService(sp => sp.GetRequiredService<OrderExpiryService>());
             AddBasketCaching(services, configuration);
 
             return services;

@@ -194,6 +194,12 @@ namespace ECommerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("RefundedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTimeOffset?>("ShippedAtUtc")
                         .HasColumnType("datetimeoffset");
 

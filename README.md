@@ -246,7 +246,7 @@ Read endpoints (`GET`) require an authenticated user; write endpoints (`POST`/`P
 | POST | `/api/v1/orders/{id}/cancel` | Cancel own Pending order |
 | PATCH | `/api/v1/orders/{id}/ship` | Admin: mark a paid order shipped |
 | PATCH | `/api/v1/orders/{id}/deliver` | Admin: mark a shipped order delivered |
-| PATCH | `/api/v1/orders/{id}/cancel` | Admin: cancel a Pending/Processing order |
+| PATCH | `/api/v1/orders/{id}/cancel` | Admin: cancel a Pending order, or a paid order after issuing a full Stripe refund (→ `Refunded`) |
 | POST | `/api/v1/webhooks/stripe` | Anonymous Stripe webhook (signature-verified; `payment_intent.*` events) |
 
 Checkout re-validates cached basket prices against live products (fails on `ProductPriceChanged`/`ProductNotFound`),
@@ -255,7 +255,15 @@ Checkout also reserves stock: each basket line is deducted from the product's `I
 transaction that commits together with the order — a product without an inventory record or with insufficient stock
 fails checkout (`409 Inventory.ProductNotTracked` / `409 Inventory.InsufficientStock`). Order cancellation and refund
 release the reserved stock back (idempotent via the stock ledger).
+Admin-cancelling a paid (`Processing`) order issues a full Stripe refund first — if the refund fails, the order stays
+untouched — then transitions the aggregate to `Refunded`; the replayed `payment_intent.refunded` webhook is an
+idempotent no-op. Every cancellation also releases the reservation and emails the buyer.
+A background `OrderExpiryService` cancels `Pending` orders older than `OrderExpiry:PendingExpirationHours`
+(default 24, scanned every `OrderExpiry:ScanIntervalMinutes`, default 30) under a SQL application lock, so abandoned
+checkouts release their stock reservation instead of holding it forever; it runs on the same Outbox/Inbox flow.
 Webhook handling is idempotent: late/duplicate events cannot overwrite a later lifecycle state.
+Orders carry an EF rowversion concurrency token (`Order:RowVersion`), so racing transitions (e.g. a customer cancel
+vs. a payment-success webhook) fail loudly instead of silently overwriting each other.
 
 ### Auth (anonymous except where noted)
 

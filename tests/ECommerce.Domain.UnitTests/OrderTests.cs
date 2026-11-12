@@ -415,9 +415,37 @@ public class OrderTests
     }
 
     [Fact]
-    public void Refund_AfterCancelled_Fails()
+    public void Refund_AfterCancelledUnpaidOrder_Fails()
     {
         var order = CreateOrder(BasketItem()).Value;
+        Assert.True(order.CancelOrder("customer").IsSuccess);
+
+        Assert.True(order.Refund().IsFailure);
+    }
+
+    [Fact]
+    public void Refund_AfterCancelledPaidOrder_Succeeds()
+    {
+        var order = PaidOrder();
+        Assert.True(order.CancelOrder("Cancelled by admin").IsSuccess);
+        var before = DateTimeOffset.UtcNow;
+
+        var result = order.Refund();
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(OrderStatus.Refunded, order.Status);
+        Assert.InRange(order.RefundedAtUtc!.Value, before, after);
+        Assert.Equal("Cancelled by admin", order.CancellationReason);
+    }
+
+    [Fact]
+    public void Refund_AfterCancelledUnpaidOrder_HasNoRefundPathEvenWithIntent()
+    {
+        // A Pending order can hold a payment intent without having been paid;
+        // cancelling it must still not open a refund path.
+        var order = CreateOrder(BasketItem()).Value;
+        Assert.True(order.SetPaymentIntentId("pi_test_123").IsSuccess);
         Assert.True(order.CancelOrder("customer").IsSuccess);
 
         Assert.True(order.Refund().IsFailure);

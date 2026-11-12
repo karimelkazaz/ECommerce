@@ -4,12 +4,6 @@ using ECommerce.Domain.Entities.Orders;
 
 namespace ECommerce.Application.Orders.Emails;
 
-/// <summary>
-/// Pure composition of the transactional email content from the notification
-/// snapshots. No infrastructure dependencies: sender consumers marry these
-/// bodies to <c>IEmailSender.SendAsync</c>. Everything the notification
-/// carries is HTML-escaped — order lines contain user-facing product names.
-/// </summary>
 internal static class OrderConfirmationEmailBuilder
 {
     public static (string Subject, string HtmlBody) BuildOrderConfirmation(
@@ -49,6 +43,29 @@ internal static class OrderConfirmationEmailBuilder
             .Append(", your payment for order <strong>")
             .Append(notification.OrderId.Value.ToString("N"))
             .Append("</strong> did not go through. Please retry checkout to keep the order.</p>");
+
+        AppendTotal(body, notification.CurrencyCode, "Order total", notification.TotalAmount);
+
+        return (subject, body.ToString());
+    }
+
+    public static (string Subject, string HtmlBody) BuildCancelled(
+        OrderCancelledEmailNotification notification)
+    {
+        var subject = $"Order cancelled — {notification.OrderId.Value:N}";
+
+        var body = new StringBuilder();
+        body.Append("<p>Hi ").Append(Escape(notification.CustomerFirstName))
+            .Append(", your order <strong>")
+            .Append(notification.OrderId.Value.ToString("N"))
+            .Append("</strong> has been cancelled.");
+
+        if (!string.IsNullOrWhiteSpace(notification.CancellationReason))
+        {
+            body.Append(" Reason: ").Append(Escape(notification.CancellationReason)).Append('.');
+        }
+
+        body.Append("</p>");
 
         AppendTotal(body, notification.CurrencyCode, "Order total", notification.TotalAmount);
 

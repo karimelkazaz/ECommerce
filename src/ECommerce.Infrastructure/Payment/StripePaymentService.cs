@@ -82,6 +82,33 @@ public sealed class StripePaymentService(
         }
     }
 
+    public async Task<Result> CreateRefundAsync(string paymentIntentId, CancellationToken ct = default)
+    {
+        StripeConfiguration.ApiKey = _options.SecretKey;
+
+        // Replayed refund requests (e.g. a retry after a timeout) hit the same
+        // idempotency key instead of refunding twice.
+        var requestOptions = new RequestOptions { IdempotencyKey = $"refund:{paymentIntentId}" };
+
+        try
+        {
+            await new RefundService().CreateAsync(
+                new RefundCreateOptions { PaymentIntent = paymentIntentId },
+                requestOptions,
+                ct);
+
+            return Result.Success();
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Failed to refund payment intent {PaymentIntentId}.", paymentIntentId);
+
+            return Result.Failure(Error.Problem(
+                "Payment.StripeRefundFailed",
+                ex.StripeError?.Message ?? ex.Message));
+        }
+    }
+
     public async Task<Result<PaymentWebhookOutcome>> HandleWebhookAsync(string json, string signatureHeader, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(signatureHeader))

@@ -164,6 +164,92 @@ public class OrderEmailConsumerTests
         Assert.Contains("USD 30.00", sent.HtmlBody);
     }
 
+    [Fact]
+    public async Task OrderCancelledListener_ReleasesStockAndEnqueuesCancellationEmailFollowUp()
+    {
+        var order = SeedOrder();
+        Assert.True(order.CancelOrder("Out of stock").IsSuccess);
+
+        // Outstanding reserve entry (order's product) the consumer must replay.
+        var productId = order.OrderItems.Single().ProductId;
+        var inventoryItem = InventoryItem.Create(productId, 10).Value;
+        Assert.True(inventoryItem.Reserve(order.Id, 2).IsSuccess); // available 10 -> 8
+        _inventory.Add(inventoryItem);
+
+        var identity = new FakeIdentityService(new UserProfileResponse(
+            _userId, "Ada", "Lovelace", "ada@example.com", ["Customer"]));
+
+        var handler = new OrderCancelledDomainEventHandler(
+            _db, _inventory, identity, _outboxWriter, _inbox, _unitOfWork, _messageContext,
+            NullLogger<OrderCancelledDomainEventHandler>.Instance);
+
+        await handler.Handle(new OrderCancelledDomainEvent(order.Id), CancellationToken.None);
+
+        Assert.Equal(10, inventoryItem.AvailableQuantity); // released back to 10
+
+        var followUp = Assert.Single(_outboxWriter.Messages);
+        var notification = Assert.IsType<OrderCancelledEmailNotification>(followUp);
+        Assert.Equal(order.Id, notification.OrderId);
+        Assert.Equal("ada@example.com", notification.CustomerEmail);
+        Assert.Equal("Ada", notification.CustomerFirstName);
+        Assert.Equal(25m, notification.TotalAmount);
+        Assert.Equal("USD", notification.CurrencyCode);
+        Assert.Equal("Out of stock", notification.CancellationReason);
+    }
+
+    [Fact]
+    public async Task OrderCancelledListener_WhenProfileMissing_SendsNothing()
+    {
+        var order = SeedOrder();
+        Assert.True(order.CancelOrder("test").IsSuccess);
+
+        var handler = new OrderCancelledDomainEventHandler(
+            _db, _inventory, new FakeIdentityService(), _outboxWriter, _inbox, _unitOfWork, _messageContext,
+            NullLogger<OrderCancelledDomainEventHandler>.Instance);
+
+        await handler.Handle(new OrderCancelledDomainEvent(order.Id), CancellationToken.None);
+
+        Assert.Empty(_outboxWriter.Messages);
+    }
+
+    [Fact]
+    public async Task CancelledEmailSender_FormatsAndDeliversBody()
+    {
+        var orderId = OrderId.New();
+        var notification = new OrderCancelledEmailNotification(
+            orderId, "ada@example.com", "Ada", 30m, "USD", "Cancelled by admin");
+
+        var handler = new OrderCancelledEmailRequestHandler(
+            _inbox, _unitOfWork, _messageContext, _emailSender,
+            NullLogger<OrderCancelledEmailRequestHandler>.Instance);
+
+        await handler.Handle(notification, CancellationToken.None);
+
+        var sent = Assert.Single(_emailSender.Sent);
+        Assert.Equal("ada@example.com", sent.To);
+        Assert.Equal($"Order cancelled — {orderId.Value:N}", sent.Subject);
+        Assert.Contains("Hi Ada", sent.HtmlBody);
+        Assert.Contains("has been cancelled", sent.HtmlBody);
+        Assert.Contains("Cancelled by admin", sent.HtmlBody);
+        Assert.Contains("USD 30.00", sent.HtmlBody);
+    }
+
+    [Fact]
+    public async Task CancelledEmailSender_WithoutReason_OmitsReasonLine()
+    {
+        var notification = new OrderCancelledEmailNotification(
+            OrderId.New(), "ada@example.com", "Ada", 30m, "USD", null);
+
+        var handler = new OrderCancelledEmailRequestHandler(
+            _inbox, _unitOfWork, _messageContext, _emailSender,
+            NullLogger<OrderCancelledEmailRequestHandler>.Instance);
+
+        await handler.Handle(notification, CancellationToken.None);
+
+        var sent = Assert.Single(_emailSender.Sent);
+        Assert.DoesNotContain("Reason:", sent.HtmlBody);
+    }
+
     private Order SeedOrder(string? productName = null)
     {
         var product = Domain.Entities.Products.Product.Create(

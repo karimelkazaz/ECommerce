@@ -28,6 +28,9 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.PaymentIntentId)
             .HasMaxLength(200);
 
+        builder.Property(o => o.RowVersion)
+            .IsRowVersion();
+
         // Stripe intents are only ever linked to a single order; still nullable until checkout assigns it.
         builder.HasIndex(o => o.PaymentIntentId)
             .IsUnique()

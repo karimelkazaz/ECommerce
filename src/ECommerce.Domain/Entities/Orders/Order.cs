@@ -35,6 +35,12 @@ public class Order : Entity<OrderId>
 
     public string? PaymentIntentId { get; private set; }
 
+    // EF-managed optimistic concurrency token (rowversion). Status transitions
+    // can race (e.g. a customer cancel vs. a payment-success webhook); a
+    // conflicting save fails loudly instead of silently overwriting another
+    // request's change — the same guard InventoryItem uses for stock.
+    public byte[] RowVersion { get; private set; } = [];
+
     public IReadOnlyList<OrderItem> OrderItems => _orderItems.AsReadOnly();
 
     private Order() { }
@@ -219,7 +225,11 @@ public class Order : Entity<OrderId>
         if (Status == OrderStatus.Refunded)
             return Result.Success();
 
-        if (Status is not (OrderStatus.Processing or OrderStatus.Shipped or OrderStatus.Delivered))
+        // A cancelled order whose payment already captured can still complete
+        // the refund that was initiated when it was cancelled; an unpaid
+        // cancelled order has no money to return.
+        if (Status is not (OrderStatus.Processing or OrderStatus.Shipped or OrderStatus.Delivered)
+            && !(Status == OrderStatus.Cancelled && PaidAtUtc is not null))
             return Result.Failure(OrderErrors.NotRefundable);
 
         Status = OrderStatus.Refunded;

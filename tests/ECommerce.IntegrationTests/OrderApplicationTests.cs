@@ -435,18 +435,53 @@ public class OrderApplicationTests
     }
 
     [Fact]
-    public async Task CancelOrderCommandHandler_AdminCancelsPaidOrder()
+    public async Task CancelOrderCommandHandler_AdminCancelsPaidOrder_RefundsAndMarksRefunded()
     {
         var paid = await SeedPaidOrderAsync();
 
-        var handler = new CancelOrderCommandHandler(_orderRepository, _unitOfWork);
+        var handler = new CancelOrderCommandHandler(_orderRepository, _payment, _unitOfWork);
 
         var result = await handler.Handle(new CancelOrderCommand(paid.Id.Value), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var stored = await _orderRepository.GetByIdAsync(paid.Id);
-        Assert.Equal(OrderStatus.Cancelled, stored!.Status);
+        Assert.Equal(OrderStatus.Refunded, stored!.Status);
+        Assert.NotNull(stored.RefundedAtUtc);
         Assert.Equal("Cancelled by admin", stored.CancellationReason);
+        Assert.Equal([stored.PaymentIntentId!], _payment.RefundedIntents);
+    }
+
+    [Fact]
+    public async Task CancelOrderCommandHandler_PendingOrder_CancelsWithoutRefund()
+    {
+        var pending = await SeedPendingOrderAsync();
+
+        var handler = new CancelOrderCommandHandler(_orderRepository, _payment, _unitOfWork);
+
+        var result = await handler.Handle(new CancelOrderCommand(pending.Id.Value), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var stored = await _orderRepository.GetByIdAsync(pending.Id);
+        Assert.Equal(OrderStatus.Cancelled, stored!.Status);
+        Assert.Null(stored.RefundedAtUtc);
+        Assert.Empty(_payment.RefundedIntents);
+    }
+
+    [Fact]
+    public async Task CancelOrderCommandHandler_RefundFails_OrderNotCancelled()
+    {
+        var paid = await SeedPaidOrderAsync();
+        _payment.FailRefund = true;
+
+        var handler = new CancelOrderCommandHandler(_orderRepository, _payment, _unitOfWork);
+
+        var result = await handler.Handle(new CancelOrderCommand(paid.Id.Value), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.StripeRefundFailed", result.Error.Code);
+        var stored = await _orderRepository.GetByIdAsync(paid.Id);
+        Assert.Equal(OrderStatus.Processing, stored!.Status);
+        Assert.Empty(_payment.RefundedIntents);
     }
 
     [Fact]
@@ -797,8 +832,10 @@ public class OrderApplicationTests
         private int _intentCounter;
 
         public List<string> CancelledIntents { get; } = [];
+        public List<string> RefundedIntents { get; } = [];
         public PaymentWebhookOutcome? NextOutcome { get; set; }
         public bool FailIntentCreation { get; set; }
+        public bool FailRefund { get; set; }
 
         public Task<Result<PaymentIntentResult>> CreatePaymentIntentAsync(Order order, CancellationToken ct = default)
             => Task.FromResult(FailIntentCreation
@@ -813,6 +850,18 @@ public class OrderApplicationTests
         {
             CancelledIntents.Add(paymentIntentId);
             return Task.CompletedTask;
+        }
+
+        public Task<Result> CreateRefundAsync(string paymentIntentId, CancellationToken ct = default)
+        {
+            if (FailRefund)
+            {
+                return Task.FromResult(Result.Failure(
+                    Error.Problem("Payment.StripeRefundFailed", "stripe is down")));
+            }
+
+            RefundedIntents.Add(paymentIntentId);
+            return Task.FromResult(Result.Success());
         }
 
         public Task<Result<PaymentWebhookOutcome>> HandleWebhookAsync(string json, string signatureHeader, CancellationToken ct = default)
